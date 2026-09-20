@@ -1,17 +1,51 @@
 {
   "name": "rn-firebase",
   "version": "1.0.0",
-  "description": "Unified Firebase Setup and Diagnostic CLI for React Native & Expo",
-  "main": "index.ts",
-  "module": "index.ts",
+  "description": "Unified Firebase setup CLI for React Native & Expo — configure Android, iOS, and Web from a single command",
+  "keywords": [
+    "firebase",
+    "react-native",
+    "expo",
+    "cli",
+    "setup",
+    "android",
+    "ios",
+    "web",
+    "google-services",
+    "firebase-tools",
+    "react-native-firebase"
+  ],
+  "homepage": "https://github.com/tharunpoongavanam/rn-firebase#readme",
+  "bugs": {
+    "url": "https://github.com/tharunpoongavanam/rn-firebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tharunpoongavanam/rn-firebase.git"
+  },
+  "license": "MIT",
+  "author": "Tharun Poongavanam <tharunpoongavanam@gmail.com>",
+  "main": "dist/cli.js",
+  "module": "dist/cli.js",
   "type": "module",
   "bin": {
     "rn-firebase": "./bin/rn-firebase.mjs"
   },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --target node --outfile dist/cli.js",
-    "test": "vitest run"
+    "prepublishOnly": "bun run build",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -19,11 +53,19 @@
     "vitest": "^5.0.1"
   },
   "peerDependencies": {
-    "typescript": "^7"
+    "typescript": "^5 || ^7"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
     "commander": "^15.0.0",
     "picocolors": "^1.1.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

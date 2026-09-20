@@ -1,0 +1,24 @@
+# Source files — not needed in published package (dist/ is used instead)
+src/
+tests/
+*.test.ts
+
+# Development config
+tsconfig.json
+vitest.config.*
+bun.lock
+bun.lockb
+
+# Dev artifacts
+idea.txt
+*.bak
+.tmp-*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# CI
+.github/
