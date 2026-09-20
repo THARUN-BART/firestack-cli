@@ -15,6 +15,23 @@ export interface PlatformDetectionResult {
   firebaseWebConfigPath?: string;
 }
 
+function safeResolvePath(projectDir: string, relativePath: unknown): string | null {
+  if (typeof relativePath !== 'string' || !relativePath.trim()) {
+    return null;
+  }
+  // Prevent absolute paths or paths with null bytes
+  if (path.isAbsolute(relativePath) || relativePath.includes('\0')) {
+    return null;
+  }
+  const resolved = path.resolve(projectDir, relativePath);
+  const projectRoot = path.resolve(projectDir);
+  // Ensure the resolved path is inside the project directory
+  if (!resolved.startsWith(projectRoot + path.sep) && resolved !== projectRoot) {
+    return null;
+  }
+  return resolved;
+}
+
 export function detectPlatforms(projectDir: string = process.cwd()): PlatformDetectionResult {
   const androidDir = path.join(projectDir, 'android');
   const iosDir = path.join(projectDir, 'ios');
@@ -29,13 +46,21 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
   let androidPackageName: string | undefined = expoConfig?.android?.package;
   let iosBundleId: string | undefined = expoConfig?.ios?.bundleIdentifier;
 
+  // Validate that package/bundle IDs look like reverse-domain names to avoid injection
+  if (androidPackageName && !/^[a-zA-Z][a-zA-Z0-9._]*$/.test(androidPackageName)) {
+    androidPackageName = undefined;
+  }
+  if (iosBundleId && !/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(iosBundleId)) {
+    iosBundleId = undefined;
+  }
+
   // If not found in app.json and android folder exists, inspect android project
   if (!androidPackageName && hasAndroid) {
     const buildGradlePath = path.join(androidDir, 'app', 'build.gradle');
     const buildGradle = readTextFile(buildGradlePath);
     if (buildGradle) {
-      const namespaceMatch = buildGradle.match(/namespace\s+['"]([^'"]+)['"]/);
-      const appIdMatch = buildGradle.match(/applicationId\s+['"]([^'"]+)['"]/);
+      const namespaceMatch = buildGradle.match(/namespace\s+['"]([a-zA-Z0-9._]+)['"]/);
+      const appIdMatch = buildGradle.match(/applicationId\s+['"]([a-zA-Z0-9._]+)['"]/);
       androidPackageName = namespaceMatch?.[1] || appIdMatch?.[1];
     }
 
@@ -43,7 +68,7 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
       const manifestPath = path.join(androidDir, 'app', 'src', 'main', 'AndroidManifest.xml');
       const manifest = readTextFile(manifestPath);
       if (manifest) {
-        const pkgMatch = manifest.match(/package=['"]([^'"]+)['"]/);
+        const pkgMatch = manifest.match(/package=['"]([a-zA-Z0-9._]+)['"]/);
         androidPackageName = pkgMatch?.[1];
       }
     }
@@ -61,7 +86,8 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
             const bundleMatch = pbx.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*([^;]+);/);
             if (bundleMatch && bundleMatch[1]) {
               const id = bundleMatch[1].trim();
-              if (!id.includes('$')) {
+              // Reject variable interpolations and validate format
+              if (!id.includes('$') && /^[a-zA-Z][a-zA-Z0-9._-]*$/.test(id)) {
                 iosBundleId = id;
                 break;
               }
@@ -74,12 +100,11 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
     }
   }
 
-  // Detect google-services.json
+  // Detect google-services.json — use safeResolvePath to prevent path traversal
   const defaultAndroidJson = path.join(projectDir, 'android', 'app', 'google-services.json');
   const rootAndroidJson = path.join(projectDir, 'google-services.json');
-  const expoAndroidJson = expoConfig?.android?.googleServicesFile
-    ? path.join(projectDir, expoConfig.android.googleServicesFile)
-    : undefined;
+  const expoAndroidJsonRaw = expoConfig?.android?.googleServicesFile;
+  const expoAndroidJson = safeResolvePath(projectDir, expoAndroidJsonRaw);
 
   let googleServicesJsonPath: string | undefined;
   if (expoAndroidJson && fileExists(expoAndroidJson)) {
@@ -90,11 +115,10 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
     googleServicesJsonPath = rootAndroidJson;
   }
 
-  // Detect GoogleService-Info.plist
+  // Detect GoogleService-Info.plist — use safeResolvePath
   let googleServiceInfoPlistPath: string | undefined;
-  const expoIosPlist = expoConfig?.ios?.googleServicesFile
-    ? path.join(projectDir, expoConfig.ios.googleServicesFile)
-    : undefined;
+  const expoIosPlistRaw = expoConfig?.ios?.googleServicesFile;
+  const expoIosPlist = safeResolvePath(projectDir, expoIosPlistRaw);
   const rootIosPlist = path.join(projectDir, 'GoogleService-Info.plist');
 
   if (expoIosPlist && fileExists(expoIosPlist)) {
