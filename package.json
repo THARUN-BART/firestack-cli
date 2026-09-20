@@ -15,22 +15,22 @@
     "firebase-tools",
     "react-native-firebase"
   ],
-  "homepage": "https://github.com/tharunpoongavanam/rn-firebase-cli#readme",
+  "homepage": "https://github.com/THARUN-BART/rn-firebase-cli#readme",
   "bugs": {
-    "url": "https://github.com/tharunpoongavanam/rn-firebase-cli/issues"
+    "url": "https://github.com/THARUN-BART/rn-firebase-cli/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tharunpoongavanam/rn-firebase-cli.git"
+    "url": "git+https://github.com/THARUN-BART/rn-firebase-cli.git"
   },
   "license": "MIT",
-  "author": "Tharun Poongavanam <tharunpoongavanam@gmail.com>",
+  "author": "Tharun Poongavanam <THARUN-BART@gmail.com>",
   "main": "dist/cli.js",
   "module": "dist/cli.js",
   "type": "module",
   "bin": {
-    "rn-firebase-cli": "bin/rn-firebase.mjs",
-    "rn-firebase": "bin/rn-firebase.mjs"
+    "rn-firebase-cli": "./bin/rn-firebase.mjs",
+    "rn-firebase": "./bin/rn-firebase.mjs"
   },
   "files": [
     "dist/",
