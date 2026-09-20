@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileExists, writeTextFile } from '../utils/fs';
+import { fileExists, isDirectory, readTextFile, writeTextFile } from '../utils/fs';
 import { updateExpoConfig } from '../expo/plugins';
 
 export interface IosConfigResult {
@@ -8,6 +8,24 @@ export interface IosConfigResult {
   expoConfigUpdated: boolean;
   targetPaths: string[];
   warnings: string[];
+}
+
+/**
+ * Fix #5/#8: Backup an existing file before overwriting it.
+ */
+function backupIfExists(filePath: string): string | null {
+  if (!fileExists(filePath)) return null;
+  const backupPath = filePath + '.bak';
+  try {
+    const content = readTextFile(filePath);
+    if (content) {
+      writeTextFile(backupPath, content);
+      return backupPath;
+    }
+  } catch {
+    // Non-fatal
+  }
+  return null;
 }
 
 export function configureIos(
@@ -20,15 +38,31 @@ export function configureIos(
   const targetPaths: string[] = [];
   let googleServiceInfoPlistPlaced = false;
 
+  // Validate content looks like a plist
+  if (!plistContent.trim().startsWith('<?xml') && !plistContent.trim().startsWith('<plist')) {
+    warnings.push('GoogleService-Info.plist content does not appear to be a valid plist');
+    return { googleServiceInfoPlistPlaced: false, expoConfigUpdated: false, targetPaths, warnings };
+  }
+
   const iosDir = path.join(projectDir, 'ios');
-  if (fileExists(iosDir)) {
+  // Fix #6: use isDirectory for directory check
+  if (isDirectory(iosDir)) {
     try {
       const items = fs.readdirSync(iosDir);
       for (const item of items) {
         const full = path.join(iosDir, item);
-        // Find main target directory: directory with same name as xcodeproj without .xcodeproj
-        if (fs.statSync(full).isDirectory() && !item.endsWith('.xcodeproj') && !item.endsWith('.xcworkspace') && item !== 'Pods') {
+        // Find main target directory: exclude xcodeproj/xcworkspace/Pods directories
+        if (
+          fs.statSync(full).isDirectory() &&
+          !item.endsWith('.xcodeproj') &&
+          !item.endsWith('.xcworkspace') &&
+          item !== 'Pods' &&
+          !item.startsWith('.')
+        ) {
           const targetPath = path.join(full, 'GoogleService-Info.plist');
+          // Fix #5: backup before overwriting
+          const backed = backupIfExists(targetPath);
+          if (backed) warnings.push(`Existing plist backed up to ${path.basename(backed)} in ${item}/`);
           if (writeTextFile(targetPath, plistContent)) {
             targetPaths.push(targetPath);
             googleServiceInfoPlistPlaced = true;
@@ -43,6 +77,9 @@ export function configureIos(
   let expoConfigUpdated = false;
   if (isExpo) {
     const rootPath = path.join(projectDir, 'GoogleService-Info.plist');
+    // Fix #5: backup before overwriting
+    const backed = backupIfExists(rootPath);
+    if (backed) warnings.push(`Existing root GoogleService-Info.plist backed up to ${path.basename(backed)}`);
     if (writeTextFile(rootPath, plistContent)) {
       targetPaths.push(rootPath);
       googleServiceInfoPlistPlaced = true;
