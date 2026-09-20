@@ -29,8 +29,8 @@
   "module": "dist/cli.js",
   "type": "module",
   "bin": {
-    "rn-firebase-cli": "./bin/rn-firebase.mjs",
-    "rn-firebase": "./bin/rn-firebase.mjs"
+    "rn-firebase-cli": "bin/rn-firebase.mjs",
+    "rn-firebase": "bin/rn-firebase.mjs"
   },
   "files": [
     "dist/",
