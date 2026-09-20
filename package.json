@@ -1,6 +1,6 @@
 {
   "name": "rn-firebase-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Unified Firebase setup CLI for React Native & Expo — configure Android, iOS, and Web from a single command",
   "keywords": [
     "firebase",
