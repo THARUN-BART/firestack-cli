@@ -91,4 +91,85 @@ describe('Project Detection', () => {
     expect(project.hasAndroid).toBe(true);
     expect(project.androidPackageName).toBe('com.bare.myapp');
   });
+
+  // Security Fix #2: Path traversal prevention tests
+  it('rejects path traversal attempts in app.json googleServicesFile', () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'package.json'),
+      JSON.stringify({ name: 'test', dependencies: { expo: '51.0.0' } })
+    );
+    fs.writeFileSync(
+      path.join(tempDir, 'app.json'),
+      JSON.stringify({
+        expo: {
+          android: {
+            googleServicesFile: '../../../etc/passwd',
+          },
+        },
+      })
+    );
+
+    const result = detectPlatforms(tempDir);
+    // The traversal path should be rejected — hasGoogleServicesJson must be false
+    expect(result.hasGoogleServicesJson).toBe(false);
+    expect(result.googleServicesJsonPath).toBeUndefined();
+  });
+
+  it('rejects absolute paths in app.json googleServicesFile', () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'app.json'),
+      JSON.stringify({
+        expo: {
+          android: {
+            googleServicesFile: '/etc/passwd',
+          },
+          ios: {
+            googleServicesFile: '/etc/shadow',
+          },
+        },
+      })
+    );
+
+    const result = detectPlatforms(tempDir);
+    expect(result.hasGoogleServicesJson).toBe(false);
+    expect(result.hasGoogleServiceInfoPlist).toBe(false);
+  });
+
+  it('accepts valid relative paths in app.json googleServicesFile', () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'package.json'),
+      JSON.stringify({ name: 'test', dependencies: { expo: '51.0.0' } })
+    );
+    const gsJsonPath = path.join(tempDir, 'google-services.json');
+    fs.writeFileSync(gsJsonPath, '{}');
+    fs.writeFileSync(
+      path.join(tempDir, 'app.json'),
+      JSON.stringify({
+        expo: {
+          android: {
+            googleServicesFile: './google-services.json',
+          },
+        },
+      })
+    );
+
+    const result = detectPlatforms(tempDir);
+    expect(result.hasGoogleServicesJson).toBe(true);
+  });
+
+  it('rejects invalid characters in package names from app.json', () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'app.json'),
+      JSON.stringify({
+        expo: {
+          android: { package: 'com.evil;rm -rf /' },
+          ios: { bundleIdentifier: 'com.evil$(whoami)' },
+        },
+      })
+    );
+
+    const result = detectPlatforms(tempDir);
+    expect(result.androidPackageName).toBeUndefined();
+    expect(result.iosBundleId).toBeUndefined();
+  });
 });
