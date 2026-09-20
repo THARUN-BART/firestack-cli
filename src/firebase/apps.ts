@@ -1,6 +1,6 @@
 import { runFirebaseCommand } from './cli';
 import { runCommandSync } from '../utils/exec';
-import { readTextFile, writeTextFile } from '../utils/fs';
+import { readTextFile } from '../utils/fs';
 import type { FirebaseApp } from '../types';
 
 export function listFirebaseApps(
@@ -38,10 +38,22 @@ export function listFirebaseApps(
   };
 }
 
+/**
+ * Fix #9: Derive a readable display name from the package name
+ * instead of using the reverse-domain notation directly.
+ * e.g. "com.example.myapp" → "myapp"
+ */
+function deriveDisplayName(projectDir: string, packageOrBundle: string): string {
+  // Take the last segment of the reverse-domain as a readable label
+  const parts = packageOrBundle.split('.');
+  const lastPart = parts[parts.length - 1];
+  return lastPart && lastPart.length > 0 ? lastPart : packageOrBundle;
+}
+
 export function createAndroidApp(
   projectId: string,
-  displayName: string,
-  packageName: string
+  packageName: string,
+  displayName: string
 ): { success: boolean; app?: FirebaseApp; error?: string } {
   const args = [
     'apps:create',
@@ -79,8 +91,8 @@ export function createAndroidApp(
 
 export function createIosApp(
   projectId: string,
-  displayName: string,
-  bundleId: string
+  bundleId: string,
+  displayName: string
 ): { success: boolean; app?: FirebaseApp; error?: string } {
   const args = [
     'apps:create',
@@ -157,7 +169,7 @@ export function downloadSdkConfig(
   projectId: string,
   outputPath?: string
 ): { success: boolean; content?: string; error?: string } {
-  const args = ['apps:sdkconfig', platform.toLowerCase(), appId, '--project', projectId];
+  const args = ['apps:sdkconfig', platform.toLowerCase(), appId, '--project', projectId, '--json'];
   if (outputPath) {
     args.push('-o', outputPath);
   }

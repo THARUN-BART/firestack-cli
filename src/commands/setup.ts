@@ -1,6 +1,7 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import path from 'node:path';
+import fs from 'node:fs';
 import { detectProject } from '../detection/project';
 import { getInstallCommand } from '../detection/package-manager';
 import { runExpoPrebuild } from '../expo/prebuild';
@@ -17,7 +18,7 @@ import {
 import { configureAndroid } from '../config/android';
 import { configureIos } from '../config/ios';
 import { configureWeb, parseWebSdkConfig } from '../config/web';
-import { runCommandSync } from '../utils/exec';
+import { runCommandStringSync } from '../utils/exec';
 import { fileExists, readTextFile } from '../utils/fs';
 import type { PlatformType } from '../types';
 
@@ -133,6 +134,7 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
       validate: (value) => {
         if (!value || value.trim().length === 0) return 'Project ID is required';
         if (!/^[a-z0-9-]+$/.test(value)) return 'Use only lowercase letters, numbers, and hyphens';
+        if (value.length > 30) return 'Project ID must be 30 characters or fewer';
       },
     });
 
@@ -198,6 +200,7 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
         initialValue: 'com.example.myapp',
         validate: (val) => {
           if (!val || !val.includes('.')) return 'Must be a valid reverse-domain package name';
+          if (!/^[a-zA-Z][a-zA-Z0-9._]*$/.test(val)) return 'Invalid characters in package name';
         },
       });
       if (p.isCancel(inputPkg)) {
@@ -212,8 +215,11 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     );
 
     if (!androidApp) {
+      // Fix #9: derive a readable display name (last segment of reverse-domain)
+      const parts = packageName.split('.');
+      const displayName = parts[parts.length - 1] || packageName;
       spinner.start(`Registering Android app (${packageName})...`);
-      const createRes = createAndroidApp(finalProjectId, packageName, packageName);
+      const createRes = createAndroidApp(finalProjectId, packageName, displayName);
       if (!createRes.success || !createRes.app) {
         spinner.stop(pc.red(`Failed to create Android app: ${createRes.error}`));
       } else {
@@ -226,31 +232,32 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
 
     if (androidApp?.appId) {
       spinner.start('Downloading google-services.json...');
+      // Fix #12: use try/finally to always clean up temp files (prevents credential leaks)
       const tempJson = path.join(projectDir, '.tmp-google-services.json');
-      const dlRes = downloadSdkConfig('ANDROID', androidApp.appId, finalProjectId, tempJson);
-
-      let configContent = dlRes.content;
-      if (!configContent && fileExists(tempJson)) {
-        configContent = readTextFile(tempJson) || '';
-      }
-
-      if (configContent) {
-        const configResult = configureAndroid(projectDir, configContent, project.isExpo, packageName);
-        spinner.stop(pc.green('Android configuration files installed'));
-        if (configResult.gradleModified) {
-          p.log.success('Gradle configuration updated with Google Services plugin');
-        }
-        if (configResult.expoConfigUpdated) {
-          p.log.success('Expo app.json updated with googleServicesFile & plugins');
-        }
-      } else {
-        spinner.stop(pc.red('Failed to download google-services.json: ' + (dlRes.error || '')));
-      }
-
       try {
-        const fs = await import('node:fs');
-        if (fs.existsSync(tempJson)) fs.unlinkSync(tempJson);
-      } catch {}
+        const dlRes = downloadSdkConfig('ANDROID', androidApp.appId, finalProjectId, tempJson);
+
+        let configContent = dlRes.content;
+        if (!configContent && fileExists(tempJson)) {
+          configContent = readTextFile(tempJson) || '';
+        }
+
+        if (configContent) {
+          const configResult = configureAndroid(projectDir, configContent, project.isExpo, packageName);
+          spinner.stop(pc.green('Android configuration files installed'));
+          if (configResult.gradleModified) {
+            p.log.success('Gradle configuration updated with Google Services plugin');
+          }
+          if (configResult.expoConfigUpdated) {
+            p.log.success('Expo app.json updated with googleServicesFile & plugins');
+          }
+          for (const w of configResult.warnings) p.log.warn(w);
+        } else {
+          spinner.stop(pc.red('Failed to download google-services.json: ' + (dlRes.error || '')));
+        }
+      } finally {
+        try { if (fs.existsSync(tempJson)) fs.unlinkSync(tempJson); } catch {}
+      }
     }
   }
 
@@ -265,6 +272,7 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
         initialValue: project.androidPackageName || 'com.example.myapp',
         validate: (val) => {
           if (!val || !val.includes('.')) return 'Must be a valid reverse-domain bundle identifier';
+          if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(val)) return 'Invalid characters in bundle identifier';
         },
       });
       if (p.isCancel(inputBundle)) {
@@ -279,8 +287,11 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     );
 
     if (!iosApp) {
+      // Fix #9: derive a readable display name
+      const parts = bundleId.split('.');
+      const displayName = parts[parts.length - 1] || bundleId;
       spinner.start(`Registering iOS app (${bundleId})...`);
-      const createRes = createIosApp(finalProjectId, bundleId, bundleId);
+      const createRes = createIosApp(finalProjectId, bundleId, displayName);
       if (!createRes.success || !createRes.app) {
         spinner.stop(pc.red(`Failed to create iOS app: ${createRes.error}`));
       } else {
@@ -293,28 +304,29 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
 
     if (iosApp?.appId) {
       spinner.start('Downloading GoogleService-Info.plist...');
+      // Fix #12: always clean up temp file via try/finally
       const tempPlist = path.join(projectDir, '.tmp-GoogleService-Info.plist');
-      const dlRes = downloadSdkConfig('IOS', iosApp.appId, finalProjectId, tempPlist);
-
-      let configContent = dlRes.content;
-      if (!configContent && fileExists(tempPlist)) {
-        configContent = readTextFile(tempPlist) || '';
-      }
-
-      if (configContent) {
-        const configResult = configureIos(projectDir, configContent, project.isExpo, bundleId);
-        spinner.stop(pc.green('iOS configuration files installed'));
-        if (configResult.expoConfigUpdated) {
-          p.log.success('Expo app.json updated with GoogleService-Info.plist & plugins');
-        }
-      } else {
-        spinner.stop(pc.red('Failed to download GoogleService-Info.plist: ' + (dlRes.error || '')));
-      }
-
       try {
-        const fs = await import('node:fs');
-        if (fs.existsSync(tempPlist)) fs.unlinkSync(tempPlist);
-      } catch {}
+        const dlRes = downloadSdkConfig('IOS', iosApp.appId, finalProjectId, tempPlist);
+
+        let configContent = dlRes.content;
+        if (!configContent && fileExists(tempPlist)) {
+          configContent = readTextFile(tempPlist) || '';
+        }
+
+        if (configContent) {
+          const configResult = configureIos(projectDir, configContent, project.isExpo, bundleId);
+          spinner.stop(pc.green('iOS configuration files installed'));
+          if (configResult.expoConfigUpdated) {
+            p.log.success('Expo app.json updated with GoogleService-Info.plist & plugins');
+          }
+          for (const w of configResult.warnings) p.log.warn(w);
+        } else {
+          spinner.stop(pc.red('Failed to download GoogleService-Info.plist: ' + (dlRes.error || '')));
+        }
+      } finally {
+        try { if (fs.existsSync(tempPlist)) fs.unlinkSync(tempPlist); } catch {}
+      }
     }
   }
 
@@ -326,7 +338,9 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
 
     if (!webApp) {
       spinner.start('Registering Web app...');
-      const appName = path.basename(projectDir);
+      // Fix #11: safely derive a non-empty display name; path.basename('/') returns ''
+      const rawName = path.basename(path.resolve(projectDir));
+      const appName = rawName || 'firebase-web-app';
       const createRes = createWebApp(finalProjectId, appName);
       if (!createRes.success || !createRes.app) {
         spinner.stop(pc.red(`Failed to create Web app: ${createRes.error}`));
@@ -346,6 +360,7 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
         if (parsed) {
           const webRes = configureWeb(projectDir, parsed);
           spinner.stop(pc.green(`Web configuration created at ${webRes.filePath}`));
+          for (const w of webRes.warnings) p.log.warn(w);
         } else {
           spinner.stop(pc.yellow('Could not automatically parse Web SDK snippet'));
         }
@@ -375,10 +390,12 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
       initialValue: true,
     });
 
-    if (shouldInstall && !p.isCancel(shouldInstall)) {
+    // Fix #13: check isCancel FIRST — cancel symbols are truthy so && order matters
+    if (!p.isCancel(shouldInstall) && shouldInstall) {
       const installCmd = getInstallCommand(project.packageManager, missingDeps);
       spinner.start(`Running ${installCmd}...`);
-      const installRes = runCommandSync(installCmd, [], { cwd: projectDir });
+      // Fix #10: use runCommandStringSync (splits command string, runs with shell: false)
+      const installRes = runCommandStringSync(installCmd, { cwd: projectDir });
       if (installRes.exitCode === 0) {
         spinner.stop(pc.green('Dependencies installed successfully'));
       } else {

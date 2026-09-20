@@ -1,6 +1,7 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import path from 'node:path';
+import fs from 'node:fs';
 import { detectProject } from '../detection/project';
 import { runDoctorChecks } from './doctor';
 import { checkFirebaseCliInstalled } from '../firebase/cli';
@@ -17,7 +18,7 @@ import { configureAndroid } from '../config/android';
 import { configureIos } from '../config/ios';
 import { configureWeb, parseWebSdkConfig } from '../config/web';
 import { getInstallCommand } from '../detection/package-manager';
-import { runCommandSync } from '../utils/exec';
+import { runCommandStringSync } from '../utils/exec';
 import { fileExists, readTextFile } from '../utils/fs';
 
 export async function runFixCommand(
@@ -133,6 +134,10 @@ export async function runFixCommand(
       const input = await p.text({
         message: 'Enter Android package name:',
         initialValue: 'com.example.myapp',
+        validate: (val) => {
+          if (!val || !val.includes('.')) return 'Must be a valid reverse-domain package name';
+          if (!/^[a-zA-Z][a-zA-Z0-9._]*$/.test(val)) return 'Invalid characters in package name';
+        },
       });
       if (!p.isCancel(input) && input) packageName = input as string;
     }
@@ -140,8 +145,10 @@ export async function runFixCommand(
     if (packageName) {
       let app = existingApps.find((a) => a.platform === 'ANDROID' && a.packageName === packageName);
       if (!app) {
+        // Fix #9: derive a readable display name
+        const displayName = packageName.split('.').pop() || packageName;
         spinner.start(`Registering Android app (${packageName})...`);
-        const created = createAndroidApp(selectedProjectId, packageName, packageName);
+        const created = createAndroidApp(selectedProjectId, packageName, displayName);
         if (created.success && created.app) {
           app = created.app;
           spinner.stop(pc.green('Android app registered in Firebase'));
@@ -152,22 +159,25 @@ export async function runFixCommand(
 
       if (app?.appId) {
         spinner.start('Downloading and placing google-services.json...');
+        // Fix #12: use try/finally to always clean up temp files
         const tempPath = path.join(projectDir, '.tmp-gs.json');
-        const dl = downloadSdkConfig('ANDROID', app.appId, selectedProjectId, tempPath);
-        const content = dl.content || (fileExists(tempPath) ? readTextFile(tempPath) : '');
-        if (content) {
-          configureAndroid(projectDir, content, project.isExpo, packageName);
-          spinner.stop(pc.green('google-services.json installed & Gradle/Expo updated'));
-        } else {
-          spinner.stop(pc.red('Failed to retrieve google-services.json'));
-        }
         try {
-          const fs = await import('node:fs');
-          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-        } catch {}
+          const dl = downloadSdkConfig('ANDROID', app.appId, selectedProjectId, tempPath);
+          const content = dl.content || (fileExists(tempPath) ? readTextFile(tempPath) : '');
+          if (content) {
+            const res = configureAndroid(projectDir, content, project.isExpo, packageName);
+            spinner.stop(pc.green('google-services.json installed & Gradle/Expo updated'));
+            for (const w of res.warnings) p.log.warn(w);
+          } else {
+            spinner.stop(pc.red('Failed to retrieve google-services.json'));
+          }
+        } finally {
+          try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+        }
       }
     }
   }
+
 
   // Fix iOS
   if (shouldFixIos) {
@@ -177,6 +187,10 @@ export async function runFixCommand(
       const input = await p.text({
         message: 'Enter iOS bundle identifier:',
         initialValue: 'com.example.myapp',
+        validate: (val) => {
+          if (!val || !val.includes('.')) return 'Must be a valid reverse-domain bundle identifier';
+          if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(val)) return 'Invalid characters in bundle identifier';
+        },
       });
       if (!p.isCancel(input) && input) bundleId = input as string;
     }
@@ -184,8 +198,10 @@ export async function runFixCommand(
     if (bundleId) {
       let app = existingApps.find((a) => a.platform === 'IOS' && a.bundleId === bundleId);
       if (!app) {
+        // Fix #9: derive a readable display name
+        const displayName = bundleId.split('.').pop() || bundleId;
         spinner.start(`Registering iOS app (${bundleId})...`);
-        const created = createIosApp(selectedProjectId, bundleId, bundleId);
+        const created = createIosApp(selectedProjectId, bundleId, displayName);
         if (created.success && created.app) {
           app = created.app;
           spinner.stop(pc.green('iOS app registered in Firebase'));
@@ -196,22 +212,25 @@ export async function runFixCommand(
 
       if (app?.appId) {
         spinner.start('Downloading and placing GoogleService-Info.plist...');
+        // Fix #12: always clean up temp file
         const tempPath = path.join(projectDir, '.tmp-gs.plist');
-        const dl = downloadSdkConfig('IOS', app.appId, selectedProjectId, tempPath);
-        const content = dl.content || (fileExists(tempPath) ? readTextFile(tempPath) : '');
-        if (content) {
-          configureIos(projectDir, content, project.isExpo, bundleId);
-          spinner.stop(pc.green('GoogleService-Info.plist installed & Expo updated'));
-        } else {
-          spinner.stop(pc.red('Failed to retrieve GoogleService-Info.plist'));
-        }
         try {
-          const fs = await import('node:fs');
-          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-        } catch {}
+          const dl = downloadSdkConfig('IOS', app.appId, selectedProjectId, tempPath);
+          const content = dl.content || (fileExists(tempPath) ? readTextFile(tempPath) : '');
+          if (content) {
+            const res = configureIos(projectDir, content, project.isExpo, bundleId);
+            spinner.stop(pc.green('GoogleService-Info.plist installed & Expo updated'));
+            for (const w of res.warnings) p.log.warn(w);
+          } else {
+            spinner.stop(pc.red('Failed to retrieve GoogleService-Info.plist'));
+          }
+        } finally {
+          try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+        }
       }
     }
   }
+
 
   // Fix Web
   if (shouldFixWeb) {
@@ -219,7 +238,9 @@ export async function runFixCommand(
     let app = existingApps.find((a) => a.platform === 'WEB');
     if (!app) {
       spinner.start('Registering Web app in Firebase...');
-      const appName = path.basename(projectDir);
+      // Fix #11: safe display name from path.basename
+      const rawName = path.basename(path.resolve(projectDir));
+      const appName = rawName || 'firebase-web-app';
       const created = createWebApp(selectedProjectId, appName);
       if (created.success && created.app) {
         app = created.app;
@@ -237,9 +258,12 @@ export async function runFixCommand(
         if (parsed) {
           const webRes = configureWeb(projectDir, parsed);
           spinner.stop(pc.green(`Web configuration generated at ${webRes.filePath}`));
+          for (const w of webRes.warnings) p.log.warn(w);
         } else {
           spinner.stop(pc.red('Failed to parse Web SDK configuration'));
         }
+      } else {
+        spinner.stop(pc.red('Failed to download Web config: ' + (dl.error || '')));
       }
     }
   }
@@ -254,14 +278,18 @@ export async function runFixCommand(
     if (toInstall.length > 0) {
       const installCmd = getInstallCommand(project.packageManager, toInstall);
       spinner.start(`Installing ${toInstall.join(', ')}...`);
-      const res = runCommandSync(installCmd, [], { cwd: projectDir });
+      // Fix #10: use runCommandStringSync (shell: false)
+      const res = runCommandStringSync(installCmd, { cwd: projectDir });
       if (res.exitCode === 0) {
         spinner.stop(pc.green('Dependencies installed'));
       } else {
         spinner.stop(pc.red('Failed to install: ' + res.stderr));
       }
+    } else {
+      p.log.success('All dependencies are already installed');
     }
   }
+
 
   p.outro(pc.bgGreen(pc.black(' Fixes completed! ')));
 }
