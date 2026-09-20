@@ -7,7 +7,7 @@ export function createCli(): Command {
   const program = new Command();
 
   program
-    .name('rn-firebase')
+    .name('rn-firebase-cli')
     .description('Unified Firebase Setup and Diagnostic CLI for React Native & Expo')
     .version('1.0.0');
 

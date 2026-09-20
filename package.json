@@ -1,5 +1,5 @@
 {
-  "name": "rn-firebase",
+  "name": "rn-firebase-cli",
   "version": "1.0.0",
   "description": "Unified Firebase setup CLI for React Native & Expo — configure Android, iOS, and Web from a single command",
   "keywords": [
@@ -15,13 +15,13 @@
     "firebase-tools",
     "react-native-firebase"
   ],
-  "homepage": "https://github.com/tharunpoongavanam/rn-firebase#readme",
+  "homepage": "https://github.com/tharunpoongavanam/rn-firebase-cli#readme",
   "bugs": {
-    "url": "https://github.com/tharunpoongavanam/rn-firebase/issues"
+    "url": "https://github.com/tharunpoongavanam/rn-firebase-cli/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tharunpoongavanam/rn-firebase.git"
+    "url": "git+https://github.com/tharunpoongavanam/rn-firebase-cli.git"
   },
   "license": "MIT",
   "author": "Tharun Poongavanam <tharunpoongavanam@gmail.com>",
@@ -29,6 +29,7 @@
   "module": "dist/cli.js",
   "type": "module",
   "bin": {
+    "rn-firebase-cli": "./bin/rn-firebase.mjs",
     "rn-firebase": "./bin/rn-firebase.mjs"
   },
   "files": [

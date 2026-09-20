@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🔥 rn-firebase
+# 🔥 rn-firebase-cli
 
 **One command. Three platforms. Zero Firebase setup headache.**
 
-[![npm version](https://img.shields.io/npm/v/rn-firebase.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase)
-[![npm downloads](https://img.shields.io/npm/dm/rn-firebase.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase)
+[![npm version](https://img.shields.io/npm/v/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
+[![npm downloads](https://img.shields.io/npm/dm/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Node ≥18](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org)
 
 Configure Firebase for **Android, iOS, and Web** in your React Native & Expo project — automatically.
 
 ```bash
-npx rn-firebase setup
+npx rn-firebase-cli setup
 ```
 
 </div>
@@ -71,22 +71,22 @@ Android   iOS     Web
 ### Use without installing (recommended)
 
 ```bash
-npx rn-firebase setup
+npx rn-firebase-cli setup
 # or
-bunx rn-firebase setup
+bunx rn-firebase-cli setup
 ```
 
 ### Install globally
 
 ```bash
 # npm
-npm install -g rn-firebase
+npm install -g rn-firebase-cli
 
 # bun
-bun add -g rn-firebase
+bun add -g rn-firebase-cli
 
 # pnpm
-pnpm add -g rn-firebase
+pnpm add -g rn-firebase-cli
 ```
 
 ### Prerequisites
@@ -331,8 +331,8 @@ src/
 
 ```bash
 # Clone
-git clone https://github.com/tharunpoongavanam/rn-firebase.git
-cd rn-firebase
+git clone https://github.com/tharunpoongavanam/rn-firebase-cli.git
+cd rn-firebase-cli
 
 # Install
 bun install
@@ -407,7 +407,7 @@ For large changes, please open an issue first to discuss the approach.
 
 <div align="center">
 
-**[npm](https://www.npmjs.com/package/rn-firebase)** · **[GitHub](https://github.com/THARUN-BART/rn-firebase)** · **[Issues](https://github.com/THARUN-BART/rn-firebase/issues)**
+**[npm](https://www.npmjs.com/package/rn-firebase-cli)** · **[GitHub](https://github.com/tharunpoongavanam/rn-firebase-cli)** · **[Issues](https://github.com/tharunpoongavanam/rn-firebase-cli/issues)**
 
 Made with ❤️ for the React Native community
 
