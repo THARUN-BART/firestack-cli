@@ -127,9 +127,9 @@ export function generateWebConfigFileContent(
     if (!useEnvVariables) return JSON.stringify(fallback);
     const envKey = `${envPrefix}${key}`;
     if (isVite) {
-      return `import.meta.env.${envKey} || ${JSON.stringify(fallback)}`;
+      return `import.meta.env.${envKey}`;
     }
-    return `process.env.${envKey} || ${JSON.stringify(fallback)}`;
+    return `process.env.${envKey}`;
   };
 
   const serviceImports: string[] = [];

@@ -30,6 +30,29 @@ export function generateEnvVariables(
   return vars;
 }
 
+export function ensureGitIgnored(
+  projectDir: string,
+  patterns: string[] = ['.env', '.env.local', '.env*.local', '.tmp-*']
+): { updated: boolean; gitignorePath: string } {
+  const gitignorePath = path.join(projectDir, '.gitignore');
+  if (!fileExists(gitignorePath)) {
+    return { updated: false, gitignorePath };
+  }
+
+  const content = readTextFile(gitignorePath) || '';
+  const lines = content.split('\n').map((l) => l.trim());
+
+  const missing = patterns.filter((p) => !lines.includes(p));
+  if (missing.length === 0) {
+    return { updated: false, gitignorePath };
+  }
+
+  const updatedContent = content.trimEnd() + '\n\n# Firebase environment & credentials\n' + missing.join('\n') + '\n';
+  const written = writeTextFile(gitignorePath, updatedContent);
+
+  return { updated: written, gitignorePath };
+}
+
 export function writeFrameworkEnvFile(
   projectDir: string,
   config: FirebaseWebConfig,
@@ -91,6 +114,9 @@ export function writeFrameworkEnvFile(
     warnings.push(`Failed to write environment variables to ${preferredFileName}`);
   }
 
+  // Ensure gitignore covers the environment file
+  ensureGitIgnored(projectDir, [preferredFileName, '.env.local', '.env*.local']);
+
   return {
     envFilePath,
     created: !exists && written,
@@ -99,3 +125,4 @@ export function writeFrameworkEnvFile(
     warnings,
   };
 }
+

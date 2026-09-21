@@ -229,5 +229,35 @@ const firebaseConfig = {
     expect(content).toContain('import.meta.env.VITE_FIREBASE_API_KEY');
     expect(content).toContain('export const auth = getAuth(app)');
   });
+
+  it('never hardcodes fallback secrets in generated code when useEnvVariables is true', () => {
+    fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'tsconfig.json'), '{}');
+
+    const config = {
+      apiKey: 'SUPER_SECRET_AIzaSyKEY',
+      authDomain: 'test.firebaseapp.com',
+      projectId: 'test-proj',
+      storageBucket: 'test.appspot.com',
+      messagingSenderId: '12345',
+      appId: '1:12345:web:67890',
+    };
+
+    const res = configureWeb(tempDir, config, {
+      framework: 'nextjs',
+      envPrefix: 'NEXT_PUBLIC_',
+      useEnvVariables: true,
+      services: ['auth'],
+      isTypeScript: true,
+    });
+
+    const content = fs.readFileSync(res.filePath, 'utf-8');
+    // It should ONLY reference process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    expect(content).toContain('process.env.NEXT_PUBLIC_FIREBASE_API_KEY');
+    // It must NEVER contain the literal secret string in the code file!
+    expect(content).not.toContain('SUPER_SECRET_AIzaSyKEY');
+  });
 });
+
+
 
