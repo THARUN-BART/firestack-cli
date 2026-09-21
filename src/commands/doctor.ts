@@ -8,38 +8,22 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
   const items: DoctorCheckItem[] = [];
   const project = detectProject(projectDir);
 
-  // Project checks
-  if (project.isExpo) {
-    items.push({
-      category: 'Project',
-      name: 'Expo project',
-      status: 'pass',
-      message: 'Expo project detected',
-    });
-  } else if (project.isBareReactNative) {
-    items.push({
-      category: 'Project',
-      name: 'React Native project',
-      status: 'pass',
-      message: 'Bare React Native project detected',
-    });
-  } else {
-    items.push({
-      category: 'Project',
-      name: 'Project structure',
-      status: 'warn',
-      message: 'Neither Expo nor Bare React Native cleanly detected',
-    });
-  }
+  // 1. Project Framework Check
+  items.push({
+    category: 'Project',
+    name: 'Framework',
+    status: 'pass',
+    message: `${project.frameworkDisplayName} (${project.packageManager})`,
+  });
 
-  // Firebase CLI check
+  // 2. Firebase CLI Check
   const cliCheck = checkFirebaseCliInstalled();
   if (cliCheck.installed) {
     items.push({
       category: 'Project',
       name: 'Firebase CLI',
       status: 'pass',
-      message: `Firebase CLI installed (${cliCheck.version})`,
+      message: `Installed (${cliCheck.version})`,
     });
   } else {
     items.push({
@@ -50,7 +34,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
     });
   }
 
-  // Firebase Auth check
+  // 3. Firebase Auth Check
   if (cliCheck.installed) {
     const authCheck = checkFirebaseAuth();
     if (authCheck.authenticated) {
@@ -70,109 +54,147 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
     }
   }
 
-  // Android checks
-  if (project.hasGoogleServicesJson) {
+  // 4. Environment & Web Config Checks for Web Frameworks
+  if (project.isWebFramework) {
+    if (project.hasEnvFile) {
+      items.push({
+        category: 'Environment',
+        name: project.envFileName,
+        status: 'pass',
+        message: `Environment configuration file found (${project.envFileName})`,
+      });
+    } else {
+      items.push({
+        category: 'Environment',
+        name: project.envFileName,
+        status: 'warn',
+        message: `Missing ${project.envFileName} for ${project.frameworkDisplayName}`,
+        fixAction: 'rn-firebase fix env',
+        fixPlatform: 'env',
+      });
+    }
+
+    if (project.hasFirebaseWebConfig) {
+      items.push({
+        category: 'Web',
+        name: 'Firebase configuration',
+        status: 'pass',
+        message: `Configuration module found (${project.firebaseWebConfigPath || 'src/lib/firebase.ts'})`,
+      });
+    } else {
+      items.push({
+        category: 'Web',
+        name: 'Firebase configuration',
+        status: 'fail',
+        message: 'Missing Firebase configuration module',
+        fixAction: 'rn-firebase fix web',
+        fixPlatform: 'web',
+      });
+    }
+
+    const hasFirebaseSdk = !!project.installedDependencies['firebase'];
     items.push({
-      category: 'Android',
-      name: 'google-services.json',
-      status: 'pass',
-      message: 'Configuration file found',
-    });
-  } else {
-    items.push({
-      category: 'Android',
-      name: 'google-services.json',
-      status: 'fail',
-      message: 'Missing google-services.json',
-      fixAction: 'rn-firebase fix android',
-      fixPlatform: 'android',
+      category: 'Dependencies',
+      name: 'firebase (JS SDK)',
+      status: hasFirebaseSdk ? 'pass' : 'fail',
+      message: hasFirebaseSdk ? 'Installed' : 'Missing firebase package',
+      fixAction: 'rn-firebase fix deps',
+      fixPlatform: 'deps',
     });
   }
 
-  if (project.androidPackageName) {
+  // 5. Native Checks for Mobile / Universal Frameworks (Expo, Bare React Native)
+  if (!project.isWebFramework || project.hasAndroid || project.hasIos) {
+    // Android checks
+    if (project.hasGoogleServicesJson) {
+      items.push({
+        category: 'Android',
+        name: 'google-services.json',
+        status: 'pass',
+        message: 'Configuration file found',
+      });
+    } else {
+      items.push({
+        category: 'Android',
+        name: 'google-services.json',
+        status: 'fail',
+        message: 'Missing google-services.json',
+        fixAction: 'rn-firebase fix android',
+        fixPlatform: 'android',
+      });
+    }
+
+    if (project.androidPackageName) {
+      items.push({
+        category: 'Android',
+        name: 'Package ID',
+        status: 'pass',
+        message: project.androidPackageName,
+      });
+    } else if (project.hasAndroid || project.isExpo) {
+      items.push({
+        category: 'Android',
+        name: 'Package ID',
+        status: 'warn',
+        message: 'Could not detect Android package name',
+        fixAction: 'rn-firebase fix android',
+        fixPlatform: 'android',
+      });
+    }
+
+    // iOS checks
+    if (project.hasGoogleServiceInfoPlist) {
+      items.push({
+        category: 'iOS',
+        name: 'GoogleService-Info.plist',
+        status: 'pass',
+        message: 'Configuration file found',
+      });
+    } else {
+      items.push({
+        category: 'iOS',
+        name: 'GoogleService-Info.plist',
+        status: 'fail',
+        message: 'Missing GoogleService-Info.plist',
+        fixAction: 'rn-firebase fix ios',
+        fixPlatform: 'ios',
+      });
+    }
+
+    if (project.iosBundleId) {
+      items.push({
+        category: 'iOS',
+        name: 'Bundle ID',
+        status: 'pass',
+        message: project.iosBundleId,
+      });
+    } else if (project.hasIos || project.isExpo) {
+      items.push({
+        category: 'iOS',
+        name: 'Bundle ID',
+        status: 'warn',
+        message: 'Could not detect iOS bundle identifier',
+        fixAction: 'rn-firebase fix ios',
+        fixPlatform: 'ios',
+      });
+    }
+
+    // React Native Firebase dependencies checks
+    const hasRnfApp = !!project.installedDependencies['@react-native-firebase/app'];
+    const hasFirebaseJs = !!project.installedDependencies['firebase'];
+    const hasAnyDep = hasRnfApp || hasFirebaseJs;
+
     items.push({
-      category: 'Android',
-      name: 'Package ID',
-      status: 'pass',
-      message: project.androidPackageName,
-    });
-  } else {
-    items.push({
-      category: 'Android',
-      name: 'Package ID',
-      status: 'warn',
-      message: 'Could not detect Android package name',
-      fixAction: 'rn-firebase fix android',
-      fixPlatform: 'android',
+      category: 'Dependencies',
+      name: project.isExpo ? 'Firebase SDK' : '@react-native-firebase/app',
+      status: hasAnyDep ? 'pass' : 'warn',
+      message: hasAnyDep
+        ? `Installed (${hasRnfApp ? '@react-native-firebase/app' : 'firebase'})`
+        : 'Missing Firebase dependency',
+      fixAction: 'rn-firebase fix deps',
+      fixPlatform: 'deps',
     });
   }
-
-  // iOS checks
-  if (project.hasGoogleServiceInfoPlist) {
-    items.push({
-      category: 'iOS',
-      name: 'GoogleService-Info.plist',
-      status: 'pass',
-      message: 'Configuration file found',
-    });
-  } else {
-    items.push({
-      category: 'iOS',
-      name: 'GoogleService-Info.plist',
-      status: 'fail',
-      message: 'Missing GoogleService-Info.plist',
-      fixAction: 'rn-firebase fix ios',
-      fixPlatform: 'ios',
-    });
-  }
-
-  if (project.iosBundleId) {
-    items.push({
-      category: 'iOS',
-      name: 'Bundle ID',
-      status: 'pass',
-      message: project.iosBundleId,
-    });
-  } else {
-    items.push({
-      category: 'iOS',
-      name: 'Bundle ID',
-      status: 'warn',
-      message: 'Could not detect iOS bundle identifier',
-      fixAction: 'rn-firebase fix ios',
-      fixPlatform: 'ios',
-    });
-  }
-
-  // Web checks
-  if (project.hasFirebaseWebConfig) {
-    items.push({
-      category: 'Web',
-      name: 'Firebase Web config',
-      status: 'pass',
-      message: 'Web configuration found',
-    });
-  } else {
-    items.push({
-      category: 'Web',
-      name: 'Firebase Web config',
-      status: 'fail',
-      message: 'Missing Firebase Web configuration file',
-      fixAction: 'rn-firebase fix web',
-      fixPlatform: 'web',
-    });
-  }
-
-  // Dependencies checks
-  const hasRnfApp = !!project.installedDependencies['@react-native-firebase/app'];
-  items.push({
-    category: 'Dependencies',
-    name: '@react-native-firebase/app',
-    status: hasRnfApp ? 'pass' : 'warn',
-    message: hasRnfApp ? 'Installed' : 'Missing @react-native-firebase/app',
-    fixAction: `rn-firebase fix deps`,
-    fixPlatform: 'deps',
-  });
 
   const hasFailures = items.some((i) => i.status === 'fail');
   const hasWarnings = items.some((i) => i.status === 'warn');
@@ -186,7 +208,7 @@ export function runDoctorCommand(options: { cwd?: string } = {}) {
 
   const report = runDoctorChecks(projectDir);
 
-  const categories = ['Project', 'Android', 'iOS', 'Web', 'Dependencies'] as const;
+  const categories = ['Project', 'Environment', 'Android', 'iOS', 'Web', 'Dependencies'] as const;
 
   for (const cat of categories) {
     const catItems = report.items.filter((i) => i.category === cat);

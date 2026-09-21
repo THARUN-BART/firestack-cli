@@ -15,10 +15,10 @@ describe('Doctor Checks', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('flags missing files and suggests fixes', () => {
+  it('flags missing files and suggests fixes for Expo / React Native projects', () => {
     fs.writeFileSync(
       path.join(tempDir, 'package.json'),
-      JSON.stringify({ name: 'empty-test' })
+      JSON.stringify({ name: 'expo-test', dependencies: { expo: '51.0.0' } })
     );
 
     const report = runDoctorChecks(tempDir);
@@ -35,15 +35,9 @@ describe('Doctor Checks', () => {
     );
     expect(missingIos?.status).toBe('fail');
     expect(missingIos?.fixAction).toBe('rn-firebase fix ios');
-
-    const missingWeb = report.items.find(
-      (i) => i.category === 'Web' && i.name === 'Firebase Web config'
-    );
-    expect(missingWeb?.status).toBe('fail');
-    expect(missingWeb?.fixAction).toBe('rn-firebase fix web');
   });
 
-  it('detects existing files and passes checks', () => {
+  it('detects existing files and passes checks for healthy Expo project', () => {
     fs.writeFileSync(
       path.join(tempDir, 'package.json'),
       JSON.stringify({
@@ -82,8 +76,33 @@ describe('Doctor Checks', () => {
 
     const iosCheck = report.items.find((i) => i.name === 'GoogleService-Info.plist');
     expect(iosCheck?.status).toBe('pass');
+  });
 
-    const webCheck = report.items.find((i) => i.name === 'Firebase Web config');
+  it('runs web-specific checks for Next.js and Vite projects', () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'my-nextjs-app',
+        dependencies: {
+          next: '^14.0.0',
+          react: '^18.0.0',
+          firebase: '^10.0.0',
+        },
+      })
+    );
+    fs.writeFileSync(path.join(tempDir, '.env.local'), 'NEXT_PUBLIC_FIREBASE_API_KEY="key"');
+    fs.mkdirSync(path.join(tempDir, 'src', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'src', 'lib', 'firebase.ts'), 'export const app = {};');
+
+    const report = runDoctorChecks(tempDir);
+
+    const envCheck = report.items.find((i) => i.category === 'Environment');
+    expect(envCheck?.status).toBe('pass');
+
+    const webCheck = report.items.find((i) => i.category === 'Web');
     expect(webCheck?.status).toBe('pass');
+
+    const depCheck = report.items.find((i) => i.name === 'firebase (JS SDK)');
+    expect(depCheck?.status).toBe('pass');
   });
 });

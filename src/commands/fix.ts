@@ -17,6 +17,7 @@ import {
 import { configureAndroid } from '../config/android';
 import { configureIos } from '../config/ios';
 import { configureWeb, parseWebSdkConfig } from '../config/web';
+import { writeFrameworkEnvFile } from '../config/env';
 import { getInstallCommand } from '../detection/package-manager';
 import { runCommandStringSync } from '../utils/exec';
 import { fileExists, readTextFile } from '../utils/fs';
@@ -33,7 +34,7 @@ export async function runFixCommand(
   const report = runDoctorChecks(projectDir);
 
   const normalizedTarget = targetPlatform?.toLowerCase().trim();
-  const validTargets = ['android', 'ios', 'web', 'deps', 'all'];
+  const validTargets = ['android', 'ios', 'web', 'env', 'deps', 'all'];
 
   if (normalizedTarget && !validTargets.includes(normalizedTarget)) {
     p.log.error(`Unknown fix target: "${targetPlatform}". Valid targets: ${validTargets.join(', ')}`);
@@ -81,7 +82,6 @@ export async function runFixCommand(
     process.exit(1);
   }
 
-  // Need a project
   const spinner = p.spinner();
   spinner.start('Fetching Firebase projects...');
   const projRes = listFirebaseProjects();
@@ -122,6 +122,10 @@ export async function runFixCommand(
     (!normalizedTarget || normalizedTarget === 'all' || normalizedTarget === 'web') &&
     itemsToFix.some((i) => i.fixPlatform === 'web');
 
+  const shouldFixEnv =
+    (!normalizedTarget || normalizedTarget === 'all' || normalizedTarget === 'env') &&
+    itemsToFix.some((i) => i.fixPlatform === 'env');
+
   const shouldFixDeps =
     (!normalizedTarget || normalizedTarget === 'all' || normalizedTarget === 'deps') &&
     itemsToFix.some((i) => i.fixPlatform === 'deps');
@@ -145,7 +149,6 @@ export async function runFixCommand(
     if (packageName) {
       let app = existingApps.find((a) => a.platform === 'ANDROID' && a.packageName === packageName);
       if (!app) {
-        // Fix #9: derive a readable display name
         const displayName = packageName.split('.').pop() || packageName;
         spinner.start(`Registering Android app (${packageName})...`);
         const created = createAndroidApp(selectedProjectId, packageName, displayName);
@@ -159,7 +162,6 @@ export async function runFixCommand(
 
       if (app?.appId) {
         spinner.start('Downloading and placing google-services.json...');
-        // Fix #12: use try/finally to always clean up temp files
         const tempPath = path.join(projectDir, '.tmp-gs.json');
         try {
           const dl = downloadSdkConfig('ANDROID', app.appId, selectedProjectId, tempPath);
@@ -177,7 +179,6 @@ export async function runFixCommand(
       }
     }
   }
-
 
   // Fix iOS
   if (shouldFixIos) {
@@ -198,7 +199,6 @@ export async function runFixCommand(
     if (bundleId) {
       let app = existingApps.find((a) => a.platform === 'IOS' && a.bundleId === bundleId);
       if (!app) {
-        // Fix #9: derive a readable display name
         const displayName = bundleId.split('.').pop() || bundleId;
         spinner.start(`Registering iOS app (${bundleId})...`);
         const created = createIosApp(selectedProjectId, bundleId, displayName);
@@ -212,7 +212,6 @@ export async function runFixCommand(
 
       if (app?.appId) {
         spinner.start('Downloading and placing GoogleService-Info.plist...');
-        // Fix #12: always clean up temp file
         const tempPath = path.join(projectDir, '.tmp-gs.plist');
         try {
           const dl = downloadSdkConfig('IOS', app.appId, selectedProjectId, tempPath);
@@ -231,16 +230,14 @@ export async function runFixCommand(
     }
   }
 
-
-  // Fix Web
-  if (shouldFixWeb) {
-    p.log.step(pc.bold('Fixing Web...'));
+  // Fix Web / Environment
+  if (shouldFixWeb || shouldFixEnv) {
+    p.log.step(pc.bold('Fixing Web & Environment configuration...'));
     let app = existingApps.find((a) => a.platform === 'WEB');
     if (!app) {
       spinner.start('Registering Web app in Firebase...');
-      // Fix #11: safe display name from path.basename
       const rawName = path.basename(path.resolve(projectDir));
-      const appName = rawName || 'firebase-web-app';
+      const appName = rawName || 'firebase-app';
       const created = createWebApp(selectedProjectId, appName);
       if (created.success && created.app) {
         app = created.app;
@@ -256,9 +253,26 @@ export async function runFixCommand(
       if (dl.success && dl.content) {
         const parsed = parseWebSdkConfig(dl.content);
         if (parsed) {
-          const webRes = configureWeb(projectDir, parsed);
-          spinner.stop(pc.green(`Web configuration generated at ${webRes.filePath}`));
-          for (const w of webRes.warnings) p.log.warn(w);
+          if (shouldFixEnv || project.isWebFramework) {
+            writeFrameworkEnvFile(
+              projectDir,
+              parsed,
+              project.envPrefix,
+              project.envFileName
+            );
+            p.log.success(`Environment variables written to ${project.envFileName}`);
+          }
+
+          if (shouldFixWeb) {
+            const webRes = configureWeb(projectDir, parsed, {
+              framework: project.framework,
+              envPrefix: project.envPrefix,
+              useEnvVariables: project.isWebFramework,
+              isTypeScript: project.isTypeScript,
+            });
+            spinner.stop(pc.green(`Web configuration generated at ${webRes.filePath}`));
+            for (const w of webRes.warnings) p.log.warn(w);
+          }
         } else {
           spinner.stop(pc.red('Failed to parse Web SDK configuration'));
         }
@@ -272,13 +286,18 @@ export async function runFixCommand(
   if (shouldFixDeps) {
     p.log.step(pc.bold('Fixing Dependencies...'));
     const toInstall: string[] = [];
-    if (!project.installedDependencies['@react-native-firebase/app']) {
-      toInstall.push('@react-native-firebase/app');
+
+    if (project.isWebFramework && !project.installedDependencies['firebase']) {
+      toInstall.push('firebase');
     }
+
+    if (!project.isWebFramework && !project.installedDependencies['@react-native-firebase/app'] && !project.installedDependencies['firebase']) {
+      toInstall.push(project.isExpo ? 'firebase' : '@react-native-firebase/app');
+    }
+
     if (toInstall.length > 0) {
       const installCmd = getInstallCommand(project.packageManager, toInstall);
       spinner.start(`Installing ${toInstall.join(', ')}...`);
-      // Fix #10: use runCommandStringSync (shell: false)
       const res = runCommandStringSync(installCmd, { cwd: projectDir });
       if (res.exitCode === 0) {
         spinner.stop(pc.green('Dependencies installed'));
@@ -289,7 +308,6 @@ export async function runFixCommand(
       p.log.success('All dependencies are already installed');
     }
   }
-
 
   p.outro(pc.bgGreen(pc.black(' Fixes completed! ')));
 }

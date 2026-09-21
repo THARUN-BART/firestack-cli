@@ -1,5 +1,6 @@
 export * from './types';
 export * from './detection/project';
+export * from './detection/framework';
 export * from './detection/package-manager';
 export * from './detection/platforms';
 export * from './detection/dependencies';
@@ -12,6 +13,7 @@ export * from './firebase/apps';
 export * from './config/android';
 export * from './config/ios';
 export * from './config/web';
+export * from './config/env';
 export * from './commands/doctor';
 export * from './commands/setup';
 export * from './commands/fix';

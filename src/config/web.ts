@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileExists, isDirectory, writeTextFile } from '../utils/fs';
-import type { FirebaseWebConfig } from '../types';
+import type { FirebaseWebConfig, FrameworkType, EnvPrefix, FirebaseService } from '../types';
 
 export interface WebConfigResult {
   filePath: string;
@@ -8,17 +8,24 @@ export interface WebConfigResult {
   warnings: string[];
 }
 
+export interface WebConfigOptions {
+  framework?: FrameworkType;
+  envPrefix?: EnvPrefix;
+  useEnvVariables?: boolean;
+  services?: FirebaseService[];
+  isTypeScript?: boolean;
+}
+
 /**
- * Fix #7: Parse Web SDK config more robustly.
- * Firebase CLI --json mode returns an object with a `sdkConfig` key.
- * We try structured parsing first, then fall back to pattern matching.
+ * Robust Web SDK config parser supporting:
+ * 1. Firebase CLI JSON output { result: { sdkConfig: { ... } } }
+ * 2. JS config blocks `const firebaseConfig = { ... }`
+ * 3. Individual key extraction
  */
 export function parseWebSdkConfig(rawOutput: string): FirebaseWebConfig | null {
   try {
-    // Strip ANSI escape codes
     const cleaned = rawOutput.replace(/\x1B\[[0-9;]*m/g, '');
 
-    // Strategy 1: Firebase CLI --json output wraps config in { result: { sdkConfig: {...} } }
     const lines = cleaned.split('\n');
     let jsonStart = -1;
     for (let i = 0; i < lines.length; i++) {
@@ -33,7 +40,6 @@ export function parseWebSdkConfig(rawOutput: string): FirebaseWebConfig | null {
         try {
           const candidate = lines.slice(jsonStart, end).join('\n');
           const parsed = JSON.parse(candidate);
-          // Firebase CLI returns { status, result: { sdkConfig: {...} } }
           const sdkConfig = parsed?.result?.sdkConfig || parsed?.sdkConfig || parsed;
           if (sdkConfig?.apiKey && sdkConfig?.projectId && sdkConfig?.appId) {
             return {
@@ -52,11 +58,8 @@ export function parseWebSdkConfig(rawOutput: string): FirebaseWebConfig | null {
       }
     }
 
-    // Strategy 2: Match the JS `const firebaseConfig = { ... }` pattern
-    // Find the specific block rather than greedy [\s\S]*
     const configBlockMatch = cleaned.match(/(?:const\s+firebaseConfig\s*=\s*|firebaseConfig\s*=\s*)(\{[^}]+\})/s);
     if (configBlockMatch) {
-      // Replace JS-style property names into valid JSON
       const jsObj = configBlockMatch[1]
         .replace(/(\w+):/g, '"$1":')
         .replace(/'/g, '"');
@@ -78,7 +81,6 @@ export function parseWebSdkConfig(rawOutput: string): FirebaseWebConfig | null {
       }
     }
 
-    // Strategy 3: Individual key-value extraction as last resort
     const apiKey = cleaned.match(/apiKey:\s*['"]([^'"]+)['"]/)?.[1];
     const authDomain = cleaned.match(/authDomain:\s*['"]([^'"]+)['"]/)?.[1];
     const projectId = cleaned.match(/projectId:\s*['"]([^'"]+)['"]/)?.[1];
@@ -105,50 +107,158 @@ export function parseWebSdkConfig(rawOutput: string): FirebaseWebConfig | null {
   return null;
 }
 
-export function generateWebConfigFileContent(config: FirebaseWebConfig, isTypeScript = true): string {
-  const code = `// Firebase Web Configuration (Firebase JS SDK)
-// Note: This configuration is specifically used for Web platform builds.
-// For native Android & iOS, React Native Firebase utilizes native configuration files:
-// - Android: google-services.json
-// - iOS: GoogleService-Info.plist
+/**
+ * Generates tailored Firebase JavaScript/TypeScript boilerplate code
+ * with singleton client guards and optional service exports (Auth, Firestore, Storage, etc.)
+ */
+export function generateWebConfigFileContent(
+  config: FirebaseWebConfig,
+  options: WebConfigOptions = {}
+): string {
+  const {
+    framework = 'generic',
+    envPrefix = '',
+    useEnvVariables = false,
+    services = ['auth', 'firestore', 'storage'],
+  } = options;
+
+  const isVite = framework === 'vite';
+  const getEnv = (key: string, fallback: string) => {
+    if (!useEnvVariables) return JSON.stringify(fallback);
+    const envKey = `${envPrefix}${key}`;
+    if (isVite) {
+      return `import.meta.env.${envKey} || ${JSON.stringify(fallback)}`;
+    }
+    return `process.env.${envKey} || ${JSON.stringify(fallback)}`;
+  };
+
+  const serviceImports: string[] = [];
+  const serviceInitializations: string[] = [];
+  const serviceExports: string[] = [];
+
+  if (services.includes('auth')) {
+    serviceImports.push("import { getAuth } from 'firebase/auth';");
+    serviceInitializations.push("export const auth = getAuth(app);");
+    serviceExports.push('auth');
+  }
+
+  if (services.includes('firestore')) {
+    serviceImports.push("import { getFirestore } from 'firebase/firestore';");
+    serviceInitializations.push("export const db = getFirestore(app);");
+    serviceExports.push('db');
+  }
+
+  if (services.includes('storage')) {
+    serviceImports.push("import { getStorage } from 'firebase/storage';");
+    serviceInitializations.push("export const storage = getStorage(app);");
+    serviceExports.push('storage');
+  }
+
+  if (services.includes('database')) {
+    serviceImports.push("import { getDatabase } from 'firebase/database';");
+    serviceInitializations.push("export const database = getDatabase(app);");
+    serviceExports.push('database');
+  }
+
+  if (services.includes('analytics')) {
+    serviceImports.push("import { getAnalytics, isSupported } from 'firebase/analytics';");
+    serviceInitializations.push(
+      "export const analytics = typeof window !== 'undefined' ? isSupported().then(yes => yes ? getAnalytics(app) : null) : null;"
+    );
+    serviceExports.push('analytics');
+  }
+
+  const code = `// Firebase Client Configuration
+// Generated by rn-firebase-cli
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
+${serviceImports.join('\n')}
 
 export const firebaseConfig = {
-  apiKey: ${JSON.stringify(config.apiKey)},
-  authDomain: ${JSON.stringify(config.authDomain)},
-  projectId: ${JSON.stringify(config.projectId)},
-  storageBucket: ${JSON.stringify(config.storageBucket)},
-  messagingSenderId: ${JSON.stringify(config.messagingSenderId)},
-  appId: ${JSON.stringify(config.appId)}${
-    config.measurementId ? `,\n  measurementId: ${JSON.stringify(config.measurementId)}` : ''
+  apiKey: ${getEnv('FIREBASE_API_KEY', config.apiKey)},
+  authDomain: ${getEnv('FIREBASE_AUTH_DOMAIN', config.authDomain)},
+  projectId: ${getEnv('FIREBASE_PROJECT_ID', config.projectId)},
+  storageBucket: ${getEnv('FIREBASE_STORAGE_BUCKET', config.storageBucket)},
+  messagingSenderId: ${getEnv('FIREBASE_MESSAGING_SENDER_ID', config.messagingSenderId)},
+  appId: ${getEnv('FIREBASE_APP_ID', config.appId)}${
+    config.measurementId
+      ? `,\n  measurementId: ${getEnv('FIREBASE_MEASUREMENT_ID', config.measurementId)}`
+      : ''
   }
 };
 
-// Initialize Firebase for Web only if not already initialized
+// Initialize Firebase with singleton pattern
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+${serviceInitializations.join('\n')}
 `;
+
   return code;
 }
 
+/**
+ * Configure Firebase Web / JS SDK file in the appropriate directory:
+ * - Next.js: src/lib/firebase.ts or lib/firebase.ts
+ * - Vite / React: src/lib/firebase.ts or src/firebase.ts
+ * - Expo / React Native: src/firebaseConfig.ts or firebaseConfig.ts
+ */
 export function configureWeb(
   projectDir: string,
-  config: FirebaseWebConfig
+  config: FirebaseWebConfig,
+  options: WebConfigOptions = {}
 ): WebConfigResult {
   const warnings: string[] = [];
-  const srcDir = path.join(projectDir, 'src');
-  const isTs = fileExists(path.join(projectDir, 'tsconfig.json'));
+  const isTs =
+    options.isTypeScript ??
+    fileExists(path.join(projectDir, 'tsconfig.json'));
   const ext = isTs ? 'ts' : 'js';
 
-  const targetDir = isDirectory(srcDir) ? srcDir : projectDir;
-  const filePath = path.join(targetDir, `firebaseConfig.${ext}`);
+  let targetDir = projectDir;
+  const srcDir = path.join(projectDir, 'src');
+  const srcLibDir = path.join(projectDir, 'src', 'lib');
+  const libDir = path.join(projectDir, 'lib');
+  const appDir = path.join(projectDir, 'app');
 
-  // Warn if overwriting an existing file
-  if (fileExists(filePath)) {
-    warnings.push(`Overwriting existing ${path.basename(filePath)}`);
+  let fileName = `firebaseConfig.${ext}`;
+
+  if (options.framework === 'nextjs' || options.framework === 'remix') {
+    fileName = `firebase.${ext}`;
+    if (isDirectory(srcLibDir)) {
+      targetDir = srcLibDir;
+    } else if (isDirectory(srcDir)) {
+      targetDir = srcLibDir; // We'll let writeTextFile create src/lib if needed
+    } else if (isDirectory(libDir)) {
+      targetDir = libDir;
+    } else if (isDirectory(appDir)) {
+      targetDir = path.join(projectDir, 'lib');
+    } else {
+      targetDir = path.join(projectDir, 'lib');
+    }
+  } else if (options.framework === 'vite' || options.framework === 'cra') {
+    fileName = `firebase.${ext}`;
+    if (isDirectory(srcLibDir)) {
+      targetDir = srcLibDir;
+    } else if (isDirectory(srcDir)) {
+      targetDir = srcDir;
+    }
+  } else {
+    // Expo / Bare RN
+    if (isDirectory(srcDir)) {
+      targetDir = srcDir;
+    }
   }
 
-  const content = generateWebConfigFileContent(config, isTs);
+  const filePath = path.join(targetDir, fileName);
+
+  if (fileExists(filePath)) {
+    warnings.push(`Overwriting existing ${path.relative(projectDir, filePath)}`);
+  }
+
+  const content = generateWebConfigFileContent(config, {
+    ...options,
+    isTypeScript: isTs,
+  });
+
   const created = writeTextFile(filePath, content);
 
   if (!created) {

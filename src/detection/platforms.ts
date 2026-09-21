@@ -142,14 +142,20 @@ export function detectPlatforms(projectDir: string = process.cwd()): PlatformDet
 
   // Detect Firebase Web config
   const webCandidates = [
-    path.join(projectDir, 'firebaseConfig.ts'),
-    path.join(projectDir, 'firebaseConfig.js'),
-    path.join(projectDir, 'src', 'firebaseConfig.ts'),
-    path.join(projectDir, 'src', 'firebaseConfig.js'),
+    path.join(projectDir, 'src', 'lib', 'firebase.ts'),
+    path.join(projectDir, 'src', 'lib', 'firebase.js'),
+    path.join(projectDir, 'lib', 'firebase.ts'),
+    path.join(projectDir, 'lib', 'firebase.js'),
+    path.join(projectDir, 'src', 'lib', 'firebaseConfig.ts'),
+    path.join(projectDir, 'src', 'lib', 'firebaseConfig.js'),
     path.join(projectDir, 'src', 'firebase.ts'),
     path.join(projectDir, 'src', 'firebase.js'),
+    path.join(projectDir, 'src', 'firebaseConfig.ts'),
+    path.join(projectDir, 'src', 'firebaseConfig.js'),
     path.join(projectDir, 'firebase.ts'),
     path.join(projectDir, 'firebase.js'),
+    path.join(projectDir, 'firebaseConfig.ts'),
+    path.join(projectDir, 'firebaseConfig.js'),
   ];
   let firebaseWebConfigPath: string | undefined;
   for (const candidate of webCandidates) {

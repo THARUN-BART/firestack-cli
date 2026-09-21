@@ -18,14 +18,15 @@ import {
 import { configureAndroid } from '../config/android';
 import { configureIos } from '../config/ios';
 import { configureWeb, parseWebSdkConfig } from '../config/web';
+import { writeFrameworkEnvFile } from '../config/env';
 import { runCommandStringSync } from '../utils/exec';
 import { fileExists, readTextFile } from '../utils/fs';
-import type { PlatformType } from '../types';
+import type { PlatformType, FirebaseService } from '../types';
 
 export async function runSetupCommand(options: { cwd?: string } = {}) {
   const projectDir = options.cwd || process.cwd();
 
-  p.intro(pc.bgCyan(pc.black(' 🔥 Firebase Setup CLI for React Native / Expo ')));
+  p.intro(pc.bgCyan(pc.black(' 🔥 Firebase Setup CLI for Web, React Native & Expo ')));
 
   // 1. Project Detection
   const spinner = p.spinner();
@@ -33,21 +34,19 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
   const project = detectProject(projectDir);
   spinner.stop('Project analyzed');
 
-  const projectTypeStr = project.isExpo
-    ? pc.cyan('Expo project')
-    : project.isBareReactNative
-    ? pc.blue('Bare React Native project')
-    : pc.yellow('Standard JS/TS project');
-
-  p.log.info(`Project type: ${projectTypeStr}`);
+  p.log.info(`Framework: ${pc.cyan(pc.bold(project.frameworkDisplayName))}`);
   p.log.info(`Package manager: ${pc.green(project.packageManager)}`);
-  p.log.info(
-    `Native projects:\n  Android: ${project.hasAndroid ? pc.green('found') : pc.yellow('missing')}\n  iOS: ${
-      project.hasIos ? pc.green('found') : pc.yellow('missing')
-    }`
-  );
+  p.log.info(`TypeScript: ${project.isTypeScript ? pc.green('yes') : pc.yellow('no')}`);
 
-  // 2. Expo Prebuild Detection
+  if (!project.isWebFramework) {
+    p.log.info(
+      `Native projects:\n  Android: ${project.hasAndroid ? pc.green('found') : pc.yellow('missing')}\n  iOS: ${
+        project.hasIos ? pc.green('found') : pc.yellow('missing')
+      }`
+    );
+  }
+
+  // 2. Expo Prebuild Detection (for Expo projects only)
   if (project.isExpo && (!project.hasAndroid || !project.hasIos)) {
     const shouldPrebuild = await p.confirm({
       message: 'Android/iOS native projects are missing. Run Expo prebuild now?',
@@ -164,24 +163,26 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     finalProjectId = newProjectId as string;
   }
 
-  // 5. Platform Selection
-  const platformsSelected = await p.multiselect<PlatformType>({
-    message: 'Which platforms do you want to configure?',
+  // 5. Firebase Services Selection
+  const servicesSelected = await p.multiselect<FirebaseService>({
+    message: 'Which Firebase services do you want to initialize in code?',
     options: [
-      { value: 'android', label: 'Android' },
-      { value: 'ios', label: 'iOS' },
-      { value: 'web', label: 'Web' },
+      { value: 'auth', label: 'Authentication (auth)' },
+      { value: 'firestore', label: 'Cloud Firestore (db)' },
+      { value: 'storage', label: 'Cloud Storage (storage)' },
+      { value: 'database', label: 'Realtime Database (database)' },
+      { value: 'analytics', label: 'Analytics (analytics)' },
     ],
-    initialValues: ['android', 'ios'],
-    required: true,
+    initialValues: ['auth', 'firestore', 'storage'],
+    required: false,
   });
 
-  if (p.isCancel(platformsSelected)) {
+  if (p.isCancel(servicesSelected)) {
     p.cancel('Setup cancelled.');
     process.exit(0);
   }
 
-  const platforms = platformsSelected as PlatformType[];
+  const selectedServices = servicesSelected as FirebaseService[];
 
   // Fetch registered apps in selected project
   spinner.start('Fetching registered apps for project...');
@@ -189,7 +190,30 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
   spinner.stop('Apps loaded');
   const existingApps = appsRes.success ? appsRes.apps : [];
 
-  // 6. Android Configuration
+  // 6. Platform Selection (for Mobile / Universal frameworks like Expo & RN)
+  let platforms: PlatformType[] = ['web'];
+
+  if (!project.isWebFramework) {
+    const platformsSelected = await p.multiselect<PlatformType>({
+      message: 'Which platforms do you want to configure?',
+      options: [
+        { value: 'android', label: 'Android' },
+        { value: 'ios', label: 'iOS' },
+        { value: 'web', label: 'Web' },
+      ],
+      initialValues: ['android', 'ios'],
+      required: true,
+    });
+
+    if (p.isCancel(platformsSelected)) {
+      p.cancel('Setup cancelled.');
+      process.exit(0);
+    }
+
+    platforms = platformsSelected as PlatformType[];
+  }
+
+  // 7. Android Configuration (Mobile / Universal)
   if (platforms.includes('android')) {
     p.log.step(pc.bold('Configuring Android'));
 
@@ -215,7 +239,6 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     );
 
     if (!androidApp) {
-      // Fix #9: derive a readable display name (last segment of reverse-domain)
       const parts = packageName.split('.');
       const displayName = parts[parts.length - 1] || packageName;
       spinner.start(`Registering Android app (${packageName})...`);
@@ -232,7 +255,6 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
 
     if (androidApp?.appId) {
       spinner.start('Downloading google-services.json...');
-      // Fix #12: use try/finally to always clean up temp files (prevents credential leaks)
       const tempJson = path.join(projectDir, '.tmp-google-services.json');
       try {
         const dlRes = downloadSdkConfig('ANDROID', androidApp.appId, finalProjectId, tempJson);
@@ -261,7 +283,7 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     }
   }
 
-  // 7. iOS Configuration
+  // 8. iOS Configuration (Mobile / Universal)
   if (platforms.includes('ios')) {
     p.log.step(pc.bold('Configuring iOS'));
 
@@ -287,7 +309,6 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     );
 
     if (!iosApp) {
-      // Fix #9: derive a readable display name
       const parts = bundleId.split('.');
       const displayName = parts[parts.length - 1] || bundleId;
       spinner.start(`Registering iOS app (${bundleId})...`);
@@ -304,7 +325,6 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
 
     if (iosApp?.appId) {
       spinner.start('Downloading GoogleService-Info.plist...');
-      // Fix #12: always clean up temp file via try/finally
       const tempPlist = path.join(projectDir, '.tmp-GoogleService-Info.plist');
       try {
         const dlRes = downloadSdkConfig('IOS', iosApp.appId, finalProjectId, tempPlist);
@@ -330,17 +350,16 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     }
   }
 
-  // 8. Web Configuration
-  if (platforms.includes('web')) {
-    p.log.step(pc.bold('Configuring Web'));
+  // 9. Web / Framework Configuration (Next.js, Vite, React, Expo Web, etc.)
+  if (platforms.includes('web') || project.isWebFramework) {
+    p.log.step(pc.bold(`Configuring Firebase for ${project.frameworkDisplayName}`));
 
     let webApp = existingApps.find((a) => a.platform === 'WEB');
 
     if (!webApp) {
       spinner.start('Registering Web app...');
-      // Fix #11: safely derive a non-empty display name; path.basename('/') returns ''
       const rawName = path.basename(path.resolve(projectDir));
-      const appName = rawName || 'firebase-web-app';
+      const appName = rawName || 'firebase-app';
       const createRes = createWebApp(finalProjectId, appName);
       if (!createRes.success || !createRes.app) {
         spinner.stop(pc.red(`Failed to create Web app: ${createRes.error}`));
@@ -358,8 +377,32 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
       if (dlRes.success && dlRes.content) {
         const parsed = parseWebSdkConfig(dlRes.content);
         if (parsed) {
-          const webRes = configureWeb(projectDir, parsed);
-          spinner.stop(pc.green(`Web configuration created at ${webRes.filePath}`));
+          // 9a. Write environment variables (.env.local / .env)
+          const useEnv = project.isWebFramework || project.framework === 'expo';
+          if (useEnv) {
+            const envRes = writeFrameworkEnvFile(
+              projectDir,
+              parsed,
+              project.envPrefix,
+              project.envFileName
+            );
+            if (envRes.created) {
+              p.log.success(`Created ${project.envFileName} with ${project.envPrefix}FIREBASE_* variables`);
+            } else if (envRes.updated) {
+              p.log.success(`Updated ${project.envFileName} with Firebase environment variables`);
+            }
+          }
+
+          // 9b. Write framework-tailored client module (e.g. lib/firebase.ts)
+          const webRes = configureWeb(projectDir, parsed, {
+            framework: project.framework,
+            envPrefix: project.envPrefix,
+            useEnvVariables: useEnv,
+            services: selectedServices,
+            isTypeScript: project.isTypeScript,
+          });
+
+          spinner.stop(pc.green(`Firebase client initialized at ${path.relative(projectDir, webRes.filePath)}`));
           for (const w of webRes.warnings) p.log.warn(w);
         } else {
           spinner.stop(pc.yellow('Could not automatically parse Web SDK snippet'));
@@ -370,17 +413,20 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     }
   }
 
-  // 9. Dependency Management
+  // 10. Dependency Management
   p.log.step(pc.bold('Dependency Management'));
   const missingDeps: string[] = [];
 
-  const needsNativeDeps = platforms.includes('android') || platforms.includes('ios');
-  if (needsNativeDeps && !project.installedDependencies['@react-native-firebase/app']) {
-    missingDeps.push('@react-native-firebase/app');
+  if (project.isWebFramework || platforms.includes('web')) {
+    if (!project.installedDependencies['firebase']) {
+      missingDeps.push('firebase');
+    }
   }
 
-  if (platforms.includes('web') && !project.installedDependencies['firebase']) {
-    missingDeps.push('firebase');
+  if (platforms.includes('android') || platforms.includes('ios')) {
+    if (!project.installedDependencies['@react-native-firebase/app']) {
+      missingDeps.push('@react-native-firebase/app');
+    }
   }
 
   if (missingDeps.length > 0) {
@@ -390,11 +436,9 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
       initialValue: true,
     });
 
-    // Fix #13: check isCancel FIRST — cancel symbols are truthy so && order matters
     if (!p.isCancel(shouldInstall) && shouldInstall) {
       const installCmd = getInstallCommand(project.packageManager, missingDeps);
       spinner.start(`Running ${installCmd}...`);
-      // Fix #10: use runCommandStringSync (splits command string, runs with shell: false)
       const installRes = runCommandStringSync(installCmd, { cwd: projectDir });
       if (installRes.exitCode === 0) {
         spinner.stop(pc.green('Dependencies installed successfully'));
@@ -406,13 +450,18 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     p.log.success('All required Firebase dependencies are already installed');
   }
 
-  // 10. Summary & Validation
+  // 11. Summary & Validation
   p.log.step(pc.bold('Configuration Validation'));
   const refreshed = detectProject(projectDir);
 
   p.log.message(pc.bold('Project:'));
-  p.log.message(`  ${pc.green('✔')} Type: ${refreshed.isExpo ? 'Expo' : 'Bare React Native'}`);
-  p.log.message(`  ${pc.green('✔')} Connected Project: ${finalProjectId}`);
+  p.log.message(`  ${pc.green('✔')} Framework: ${refreshed.frameworkDisplayName}`);
+  p.log.message(`  ${pc.green('✔')} Connected Firebase Project: ${finalProjectId}`);
+
+  if (refreshed.isWebFramework || refreshed.hasEnvFile) {
+    p.log.message(pc.bold('Environment:'));
+    p.log.message(`  ${refreshed.hasEnvFile ? pc.green('✔') : pc.red('✗')} ${refreshed.envFileName}`);
+  }
 
   if (platforms.includes('android')) {
     p.log.message(pc.bold('Android:'));
@@ -434,26 +483,10 @@ export async function runSetupCommand(options: { cwd?: string } = {}) {
     }
   }
 
-  if (platforms.includes('web')) {
-    p.log.message(pc.bold('Web:'));
+  if (platforms.includes('web') || refreshed.isWebFramework) {
+    p.log.message(pc.bold('Web / JS SDK:'));
     p.log.message(
-      `  ${refreshed.hasFirebaseWebConfig ? pc.green('✔') : pc.red('✗')} Firebase Web configuration`
-    );
-  }
-
-  p.log.message(pc.bold('Dependencies:'));
-  p.log.message(
-    `  ${
-      refreshed.installedDependencies['@react-native-firebase/app']
-        ? pc.green('✔')
-        : pc.yellow('○')
-    } @react-native-firebase/app`
-  );
-  if (platforms.includes('web')) {
-    p.log.message(
-      `  ${
-        refreshed.installedDependencies['firebase'] ? pc.green('✔') : pc.yellow('○')
-      } firebase (JS SDK)`
+      `  ${refreshed.hasFirebaseWebConfig ? pc.green('✔') : pc.red('✗')} Firebase client module`
     );
   }
 

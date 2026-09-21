@@ -171,22 +171,63 @@ const firebaseConfig = {
     }
   });
 
-  it('warns when overwriting an existing firebaseConfig file', () => {
-    const configPath = path.join(tempDir, 'firebaseConfig.ts');
-    fs.writeFileSync(configPath, '// old config');
+  it('generates Next.js tailored client module in src/lib/firebase.ts with selected services', () => {
+    fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'tsconfig.json'), '{}');
 
     const config = {
-      apiKey: 'new-key',
-      authDomain: 'proj.firebaseapp.com',
-      projectId: 'proj',
-      storageBucket: 'proj.appspot.com',
-      messagingSenderId: '123',
-      appId: '1:123:web:abc',
+      apiKey: 'test-api-key',
+      authDomain: 'test.firebaseapp.com',
+      projectId: 'test-proj',
+      storageBucket: 'test.appspot.com',
+      messagingSenderId: '12345',
+      appId: '1:12345:web:67890',
     };
 
-    const res = configureWeb(tempDir, config);
+    const res = configureWeb(tempDir, config, {
+      framework: 'nextjs',
+      envPrefix: 'NEXT_PUBLIC_',
+      useEnvVariables: true,
+      services: ['auth', 'firestore', 'storage'],
+      isTypeScript: true,
+    });
+
     expect(res.created).toBe(true);
-    expect(res.warnings.some(w => w.includes('Overwriting'))).toBe(true);
+    expect(res.filePath).toContain('src/lib/firebase.ts');
+
+    const content = fs.readFileSync(res.filePath, 'utf-8');
+    expect(content).toContain('process.env.NEXT_PUBLIC_FIREBASE_API_KEY');
+    expect(content).toContain("import { getAuth } from 'firebase/auth'");
+    expect(content).toContain("import { getFirestore } from 'firebase/firestore'");
+    expect(content).toContain("import { getStorage } from 'firebase/storage'");
+    expect(content).toContain('export const auth = getAuth(app)');
+    expect(content).toContain('export const db = getFirestore(app)');
+  });
+
+  it('generates Vite tailored client module with import.meta.env', () => {
+    fs.writeFileSync(path.join(tempDir, 'tsconfig.json'), '{}');
+
+    const config = {
+      apiKey: 'vite-api-key',
+      authDomain: 'vite.firebaseapp.com',
+      projectId: 'vite-proj',
+      storageBucket: 'vite.appspot.com',
+      messagingSenderId: '12345',
+      appId: '1:12345:web:67890',
+    };
+
+    const res = configureWeb(tempDir, config, {
+      framework: 'vite',
+      envPrefix: 'VITE_',
+      useEnvVariables: true,
+      services: ['auth'],
+      isTypeScript: true,
+    });
+
+    expect(res.created).toBe(true);
+    const content = fs.readFileSync(res.filePath, 'utf-8');
+    expect(content).toContain('import.meta.env.VITE_FIREBASE_API_KEY');
+    expect(content).toContain('export const auth = getAuth(app)');
   });
 });
+

@@ -2,14 +2,14 @@
 
 # 🔥 rn-firebase-cli
 
-**One command. Three platforms. Zero Firebase setup headache.**
+**One command. All platforms & frameworks. Zero Firebase setup headache.**
 
 [![npm version](https://img.shields.io/npm/v/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
 [![npm downloads](https://img.shields.io/npm/dm/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Node ≥18](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org)
 
-Configure Firebase for **Android, iOS, and Web** in your React Native & Expo project — automatically.
+Automatically configure Firebase for **Next.js, Expo, React (Vite / CRA), Bare React Native, Remix, Astro, and SvelteKit** — across Android, iOS, and Web.
 
 ```bash
 npx rn-firebase-cli setup
@@ -21,12 +21,12 @@ npx rn-firebase-cli setup
 
 ## 📖 Table of Contents
 
-- [Why rn-firebase?](#-why-rn-firebase)
+- [Why rn-firebase-cli?](#-why-rn-firebase-cli)
+- [Framework Support](#-framework-support)
 - [Install](#-install)
 - [Quick Start](#-quick-start)
 - [Commands](#-commands)
 - [How It Works](#-how-it-works)
-- [Platform Support](#-platform-support)
 - [Doctor & Fix](#-doctor--fix)
 - [Safety Principles](#-safety-principles)
 - [Development](#-development)
@@ -36,33 +36,47 @@ npx rn-firebase-cli setup
 
 ---
 
-## ✨ Why rn-firebase?
+## ✨ Why rn-firebase-cli?
 
-Setting up Firebase in a React Native or Expo project is tedious:
+Setting up Firebase across different frameworks and platforms is tedious:
 
-- Download `google-services.json` → drop it in the right folder
-- Patch `android/build.gradle` and `android/app/build.gradle`
-- Download `GoogleService-Info.plist` → place it in the Xcode target folder
-- Generate `firebaseConfig.ts` for web
-- Register apps in Firebase Console for each platform
-- Install `@react-native-firebase/app`, run `expo prebuild`, …
+- **Next.js**: Register web app → generate `NEXT_PUBLIC_*` in `.env.local` → initialize singleton `src/lib/firebase.ts` → setup Auth & Firestore.
+- **Expo**: Register iOS & Android apps → download `google-services.json` & `GoogleService-Info.plist` → configure `app.json` plugins & `EXPO_PUBLIC_*` env vars.
+- **React (Vite / CRA)**: Register web app → configure `VITE_*` / `REACT_APP_*` in `.env` → initialize client SDK.
+- **Bare React Native**: Patch root and app `build.gradle` → drop plist in Xcode folder → setup `@react-native-firebase/app`.
 
-**`rn-firebase` automates all of that** from a single interactive CLI that talks directly to the Firebase API on your behalf.
+**`rn-firebase-cli` automates all of that** with intelligent framework detection and direct Firebase API integration.
 
 ```
-Your React Native / Expo project
-           │
-           ▼
-      rn-firebase
-           │
-   ┌───────┼───────┐
-   ▼       ▼       ▼
-Android   iOS     Web
-   │       │       │
-   └───────┼───────┘
-           ▼
-    Firebase Ready 🔥
+Your Project (Next.js / Expo / Vite / React Native / Remix)
+                           │
+                           ▼
+                    rn-firebase-cli
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+   Web Frameworks         Expo          Bare React Native
+ (Next.js/Vite/CRA)   (iOS/Android/Web)   (Android/iOS Native)
+         │                 │                 │
+   .env / lib/firebase   app.json + plists   Gradle + plists
+         │                 │                 │
+         └─────────────────┼─────────────────┘
+                           ▼
+                   Firebase Ready 🔥
 ```
+
+---
+
+## 🌟 Framework Support
+
+| Framework | Detection Trigger | Config File Location | Env Vars Format | SDK Configured |
+|---|---|---|---|---|
+| **Next.js** (App & Pages) | `next` | `src/lib/firebase.ts` / `lib/firebase.ts` | `NEXT_PUBLIC_FIREBASE_*` in `.env.local` | `firebase` (JS SDK) |
+| **Expo** (Managed & Bare) | `expo`, `app.json` | `app.json` + `google-services.json` + `GoogleService-Info.plist` | `EXPO_PUBLIC_FIREBASE_*` in `.env` | `@react-native-firebase` or `firebase` |
+| **React (Vite)** | `vite` + `react` | `src/lib/firebase.ts` / `src/firebase.ts` | `VITE_FIREBASE_*` in `.env` | `firebase` (JS SDK) |
+| **Create React App** | `react-scripts` | `src/firebase.ts` | `REACT_APP_FIREBASE_*` in `.env` | `firebase` (JS SDK) |
+| **Bare React Native** | `react-native` | `android/app/google-services.json` & `ios/.../GoogleService-Info.plist` | Native Gradle / Plist | `@react-native-firebase/app` |
+| **Remix / Astro / Svelte** | package matches | `src/lib/firebase.ts` / `app/lib/firebase.ts` | Framework-specific env prefix | `firebase` (JS SDK) |
 
 ---
 
@@ -101,42 +115,37 @@ pnpm add -g rn-firebase-cli
 
 ## 🚀 Quick Start
 
-From the root of your React Native or Expo project:
+From the root of your project:
 
 ```bash
-npx rn-firebase setup
+npx rn-firebase-cli setup
 ```
 
-The CLI auto-detects your project and guides you through every step:
+The CLI auto-detects your framework and guides you through every step:
 
 ```
-🔥 Firebase Setup CLI for React Native / Expo
+🔥 Firebase Setup CLI for Web, React Native & Expo
 
 ✔ Project analyzed
-  Project type: Expo project
+  Framework: Next.js (App Router)
   Package manager: bun
-  Android: found  ·  iOS: found
+  TypeScript: yes
 
 ✔ Firebase CLI v15.8.0 found
 ✔ Authenticated as you@example.com
 
 ? Select a Firebase project to connect: › my-awesome-app
-? Which platforms do you want to configure? › ◉ Android  ◉ iOS  ◉ Web
+? Which Firebase services do you want to initialize in code?
+  ✔ Authentication (auth)
+  ✔ Cloud Firestore (db)
+  ✔ Cloud Storage (storage)
 
-◆ Configuring Android
-✔ Android app registered with Firebase
-✔ Android configuration files installed
-✔ Gradle configuration updated with Google Services plugin
-
-◆ Configuring iOS
-✔ iOS app registered with Firebase
-✔ iOS configuration files installed
-
-◆ Configuring Web
-✔ Web configuration created at src/firebaseConfig.ts
+◆ Configuring Firebase for Next.js (App Router)
+✔ Created .env.local with NEXT_PUBLIC_FIREBASE_* variables
+✔ Firebase client initialized at src/lib/firebase.ts
 
 ◆ Dependency Management
-✔ All required Firebase dependencies are already installed
+✔ Installed missing dependencies (firebase)
 
 🎉 Firebase configuration complete!
 ```
@@ -148,11 +157,12 @@ The CLI auto-detects your project and guides you through every step:
 | Command | Description |
 |---|---|
 | `rn-firebase setup` | Interactive Firebase setup wizard |
-| `rn-firebase doctor` | Diagnose configuration issues (read-only) |
+| `rn-firebase doctor` | Diagnose configuration & env issues (read-only) |
 | `rn-firebase fix` | Auto-fix all detected problems |
-| `rn-firebase fix android` | Fix Android configuration only |
-| `rn-firebase fix ios` | Fix iOS configuration only |
-| `rn-firebase fix web` | Fix Web configuration only |
+| `rn-firebase fix env` | Fix environment variables (`.env.local` / `.env`) |
+| `rn-firebase fix web` | Fix Web / JS SDK configuration |
+| `rn-firebase fix android` | Fix Android native configuration |
+| `rn-firebase fix ios` | Fix iOS native configuration |
 | `rn-firebase fix deps` | Install missing Firebase dependencies |
 | `rn-firebase --help` | Show help |
 | `rn-firebase --version` | Show version |
@@ -161,173 +171,82 @@ The CLI auto-detects your project and guides you through every step:
 
 ## 🧠 How It Works
 
-### 1 · Project Detection
+### 1 · Multi-Framework Detection
 
-`rn-firebase` inspects your project before touching anything:
+`rn-firebase-cli` inspects your project before making changes:
 
-- **Project type** — Expo managed, bare React Native, or plain JS/TS
-- **Package manager** — Bun, npm, pnpm, or Yarn (detected via lockfile)
-- **Native folders** — `android/` and `ios/` presence
-- **Package / bundle IDs** — from `app.json`, `build.gradle`, `AndroidManifest.xml`, or `.pbxproj`
-- **Existing Firebase files** — `google-services.json`, `GoogleService-Info.plist`, `firebaseConfig.ts`
-- **Installed dependencies** — `@react-native-firebase/app`, `firebase`
+- **Framework** — Next.js (App / Pages router), Expo (with Expo Router), Vite, CRA, Remix, Astro, SvelteKit, Bare React Native
+- **Package manager** — Bun, npm, pnpm, or Yarn
+- **Environment format** — `.env.local` (Next.js) or `.env` (Vite/Expo) with appropriate variable prefixes
+- **Native folders** — `android/` and `ios/` presence for mobile builds
+- **Firebase services** — Auth, Firestore, Storage, Realtime DB, and Analytics
 
-### 2 · Expo Prebuild (if needed)
+### 2 · Environment Variables & Client Boilerplate
 
-For Expo projects without native folders:
+- **Generates `.env.local` or `.env`**: Safely appends or updates `FIREBASE_*` credentials while preserving all your existing non-Firebase environment variables.
+- **Generates Type-Safe Client Module**: Creates `src/lib/firebase.ts` (or `.js`) with singleton guards and typed exports for `auth`, `db`, `storage`, and `analytics`.
 
-```
-Native projects are missing.
-? Run expo prebuild now? › Yes
-```
+### 3 · Native Mobile Configuration (Expo & Bare RN)
 
-Runs `expo prebuild --no-install` so your native projects are ready for configuration.
-
-### 3 · Firebase Auth & Project Selection
-
-Uses the Firebase CLI you already authenticated with (`firebase login`). Prompts you to select an existing project or create a new one.
-
-### 4 · Per-Platform Configuration
-
-#### Android
-
-- Registers Android app in Firebase (or finds existing one)
-- Downloads `google-services.json` → places it in `android/app/`
-- Patches `android/build.gradle` to add the Google Services classpath (inside `buildscript {}` only)
-- Applies `com.google.gms.google-services` plugin in `android/app/build.gradle`
-- Updates `app.json` for Expo projects
-
-#### iOS
-
-- Registers iOS app in Firebase (or finds existing one)
-- Downloads `GoogleService-Info.plist` → places it in the correct Xcode target folder
-- Updates `app.json` for Expo projects
-
-#### Web
-
-- Registers Web app in Firebase (or finds existing one)
-- Downloads the Web SDK config
-- Generates `src/firebaseConfig.ts` (or `.js` for non-TS projects)
-
-### 5 · Dependency Management
-
-Checks which Firebase packages are missing and offers to install them using your project's package manager:
-
-```
-Missing dependencies: @react-native-firebase/app
-? Install missing dependencies using bun? › Yes
-```
-
----
-
-## 📱 Platform Support
-
-| Feature | Android | iOS | Web |
-|---|:---:|:---:|:---:|
-| Auto-detect app ID / bundle ID | ✅ | ✅ | — |
-| Firebase app registration | ✅ | ✅ | ✅ |
-| Config file download & placement | ✅ | ✅ | ✅ |
-| Gradle patching | ✅ | — | — |
-| Expo `app.json` integration | ✅ | ✅ | ✅ |
-| Doctor | ✅ | ✅ | ✅ |
-| Fix | ✅ | ✅ | ✅ |
+- **Android**: Downloads `google-services.json`, patches `build.gradle` classpath inside `buildscript {}`, applies plugin in `android/app/build.gradle`.
+- **iOS**: Downloads `GoogleService-Info.plist`, places it in Xcode target folders, and updates `app.json`.
+- **Expo Prebuild**: Detects missing native folders and offers to run `expo prebuild --no-install`.
 
 ---
 
 ## 🩺 Doctor & Fix
 
-### Doctor — read-only health check
+### Doctor — read-only diagnostics
 
 ```bash
-rn-firebase doctor
+npx rn-firebase-cli doctor
 ```
 
 ```
 🔥 Firebase Doctor
 
 Project
-  ✔ Expo project
-  ✔ Firebase CLI installed (v15.8.0)
-  ✔ Firebase authenticated
+  ✔ Framework: Next.js (App Router) (bun)
+  ✔ Firebase CLI: Installed (v15.8.0)
+  ✔ Firebase authentication: Authenticated as you@example.com
 
-Android
-  ✔ google-services.json present
-  ✔ Package ID: com.example.myapp
-
-iOS
-  ✔ GoogleService-Info.plist present
-  ✔ Bundle ID: com.example.myapp
+Environment
+  ✔ .env.local: Environment configuration file found
 
 Web
-  ✗ Firebase Web configuration missing
+  ✔ Firebase configuration: Configuration module found (src/lib/firebase.ts)
 
 Dependencies
-  ✔ @react-native-firebase/app
+  ✔ firebase (JS SDK): Installed
 
-1 issue detected.
-Run: rn-firebase fix web
+No problems detected! Your Firebase setup is healthy.
 ```
 
-### Fix — targeted remediation
+### Fix — automated remediation
 
 ```bash
-rn-firebase fix          # fix everything
-rn-firebase fix android  # Android only
-rn-firebase fix ios      # iOS only
-rn-firebase fix web      # Web only
-rn-firebase fix deps     # missing packages only
+npx rn-firebase-cli fix          # fix all issues
+npx rn-firebase-cli fix env      # fix .env / .env.local variables
+npx rn-firebase-cli fix web      # fix client boilerplate
+npx rn-firebase-cli fix android  # fix Android native
+npx rn-firebase-cli fix ios      # fix iOS native
+npx rn-firebase-cli fix deps     # install missing packages
 ```
-
-Before making any changes, the CLI shows a preview and asks for confirmation.
 
 ---
 
 ## 🛡️ Safety Principles
 
-- **No passwords** — relies solely on `firebase login` OAuth flow
+- **No passwords** — uses official `firebase login` OAuth session
 - **No silent overwrites** — existing `google-services.json` and `GoogleService-Info.plist` are backed up as `.bak` before replacement
-- **Confirmation prompts** — destructive operations always ask first
-- **No shell injection** — all subprocess calls use `shell: false` with validated arguments
-- **Path traversal protection** — paths from `app.json` are validated to stay inside the project directory
-- **Idempotent** — running `setup` twice doesn't duplicate Gradle plugins or Expo config entries
-- **Temp file cleanup** — sensitive SDK credential files downloaded to `.tmp-*` are always deleted in `finally` blocks
+- **Env safety** — `.env.local` and `.env` parsing preserves all existing environment variables
+- **No shell injection** — all subprocess execution uses `shell: false` with argument validation
+- **Path traversal protection** — paths from `app.json` are validated against root boundary
+- **Idempotent** — running setup multiple times never duplicates Gradle plugins or env keys
 
 ---
 
-## 🏗️ Architecture
-
-```
-src/
-├── cli.ts                  Commander.js entrypoint
-├── commands/
-│   ├── setup.ts            Interactive setup wizard
-│   ├── doctor.ts           Read-only diagnostics
-│   └── fix.ts              Auto-remediation
-├── detection/
-│   ├── project.ts          Aggregates all detections → ProjectInfo
-│   ├── platforms.ts        Android/iOS native dir + config file detection
-│   ├── package-manager.ts  Lockfile-based PM detection
-│   └── dependencies.ts     package.json dep scanning
-├── expo/
-│   ├── prebuild.ts         expo prebuild runner
-│   └── plugins.ts          app.json updater
-├── firebase/
-│   ├── cli.ts              Firebase CLI wrapper + JSON extractor
-│   ├── auth.ts             Auth check via firebase login:list
-│   ├── projects.ts         Projects list/create
-│   └── apps.ts             Apps list/create/sdkconfig
-├── config/
-│   ├── android.ts          google-services.json + Gradle patcher
-│   ├── ios.ts              GoogleService-Info.plist placer
-│   └── web.ts              firebaseConfig.ts generator
-└── utils/
-    ├── exec.ts             runCommandSync / runCommandAsync (shell: false)
-    └── fs.ts               Safe file I/O helpers
-```
-
----
-
-## 🧪 Development
+## 🧪 Development & Testing
 
 ```bash
 # Clone
@@ -337,71 +256,18 @@ cd rn-firebase-cli
 # Install
 bun install
 
-# Run locally in your RN/Expo project directory
-bun run src/cli.ts setup
-bun run src/cli.ts doctor
-
-# Tests (29 tests across 5 suites)
+# Run tests (44 tests across 7 suites)
 bun test
 
 # Build for distribution
 bun run build
 ```
 
-### Running tests
-
-```bash
-bun test
-```
-
-```
-✓ Firebase CLI output parsing › extracts JSON when CLI prints progress logs
-✓ Command execution security › sanitizeArg rejects shell metacharacters
-✓ Project Detection › rejects path traversal attempts in app.json
-✓ Platform Configurations › inserts classpath only inside buildscript block
-✓ Platform Configurations › creates a .bak backup before overwriting credentials
-... 29 tests pass
-```
-
----
-
-## 🗺️ Roadmap
-
-- [x] Project detection (Expo, bare RN, package manager)
-- [x] Firebase auth & project selection
-- [x] Android configuration (google-services.json + Gradle)
-- [x] iOS configuration (GoogleService-Info.plist)
-- [x] Web configuration (firebaseConfig.ts)
-- [x] Smart dependency management
-- [x] Doctor command
-- [x] Fix command (all / per-platform)
-- [x] Security hardening (path traversal, shell injection, credential backups)
-- [ ] `--dry-run` mode (preview changes without writing files)
-- [ ] `--ci` mode (non-interactive, exit code for CI pipelines)
-- [ ] `rn-firebase setup --platform android` (skip platform selection)
-- [ ] `rn-firebase doctor --json` (machine-readable output)
-- [ ] Firebase Emulator Suite integration
-- [ ] Multi-project / multi-environment support
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Make your changes and add tests
-4. Ensure all tests pass: `bun test`
-5. Open a pull request describing what changed and why
-
-For large changes, please open an issue first to discuss the approach.
-
 ---
 
 ## 📄 License
 
-[MIT](LICENSE) © [Tharun Poongavanam](https://github.com/THARUN-BART)
+[MIT](LICENSE) © [Tharun Poongavanam](https://github.com/tharunpoongavanam)
 
 ---
 
@@ -409,6 +275,6 @@ For large changes, please open an issue first to discuss the approach.
 
 **[npm](https://www.npmjs.com/package/rn-firebase-cli)** · **[GitHub](https://github.com/tharunpoongavanam/rn-firebase-cli)** · **[Issues](https://github.com/tharunpoongavanam/rn-firebase-cli/issues)**
 
-Made with ❤️ for the React Native community
+Made with ❤️ for the Web & Mobile React community
 
 </div>
