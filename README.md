@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🔥 rn-firebase-cli
+# 🔥 firestack-cli
 
 **One command. All platforms & frameworks. Zero Firebase setup headache.**
 
-[![npm version](https://img.shields.io/npm/v/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
-[![npm downloads](https://img.shields.io/npm/dm/rn-firebase-cli.svg?style=flat-square)](https://www.npmjs.com/package/rn-firebase-cli)
+[![npm version](https://img.shields.io/npm/v/firestack-cli.svg?style=flat-square)](https://www.npmjs.com/package/firestack-cli)
+[![npm downloads](https://img.shields.io/npm/dm/firestack-cli.svg?style=flat-square)](https://www.npmjs.com/package/firestack-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Node ≥18](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org)
 
 Automatically configure Firebase for **Next.js, Expo, React (Vite / CRA), Bare React Native, Remix, Astro, and SvelteKit** — across Android, iOS, and Web.
 
 ```bash
-npx rn-firebase-cli setup
+npx firestack-cli setup
 ```
 
 </div>
@@ -21,7 +21,7 @@ npx rn-firebase-cli setup
 
 ## 📖 Table of Contents
 
-- [Why rn-firebase-cli?](#-why-rn-firebase-cli)
+- [Why firestack-cli?](#-why-firestack-cli)
 - [Framework Support](#-framework-support)
 - [Install](#-install)
 - [Quick Start](#-quick-start)
@@ -30,13 +30,12 @@ npx rn-firebase-cli setup
 - [Doctor & Fix](#-doctor--fix)
 - [Safety Principles](#-safety-principles)
 - [Development](#-development)
-- [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
 - [License](#-license)
 
 ---
 
-## ✨ Why rn-firebase-cli?
+## ✨ Why firestack-cli?
 
 Setting up Firebase across different frameworks and platforms is tedious:
 
@@ -45,13 +44,13 @@ Setting up Firebase across different frameworks and platforms is tedious:
 - **React (Vite / CRA)**: Register web app → configure `VITE_*` / `REACT_APP_*` in `.env` → initialize client SDK.
 - **Bare React Native**: Patch root and app `build.gradle` → drop plist in Xcode folder → setup `@react-native-firebase/app`.
 
-**`rn-firebase-cli` automates all of that** with intelligent framework detection and direct Firebase API integration.
+**`firestack-cli` automates all of that** with intelligent framework detection and direct Firebase API integration.
 
 ```
 Your Project (Next.js / Expo / Vite / React Native / Remix)
                            │
                            ▼
-                    rn-firebase-cli
+                     firestack-cli
                            │
          ┌─────────────────┼─────────────────┐
          ▼                 ▼                 ▼
@@ -85,22 +84,22 @@ Your Project (Next.js / Expo / Vite / React Native / Remix)
 ### Use without installing (recommended)
 
 ```bash
-npx rn-firebase-cli setup
+npx firestack-cli setup
 # or
-bunx rn-firebase-cli setup
+bunx firestack-cli setup
 ```
 
 ### Install globally
 
 ```bash
 # npm
-npm install -g rn-firebase-cli
+npm install -g firestack-cli
 
 # bun
-bun add -g rn-firebase-cli
+bun add -g firestack-cli
 
 # pnpm
-pnpm add -g rn-firebase-cli
+pnpm add -g firestack-cli
 ```
 
 ### Prerequisites
@@ -118,7 +117,7 @@ pnpm add -g rn-firebase-cli
 From the root of your project:
 
 ```bash
-npx rn-firebase-cli setup
+npx firestack-cli setup
 ```
 
 The CLI auto-detects your framework and guides you through every step:
@@ -156,16 +155,16 @@ The CLI auto-detects your framework and guides you through every step:
 
 | Command | Description |
 |---|---|
-| `rn-firebase setup` | Interactive Firebase setup wizard |
-| `rn-firebase doctor` | Diagnose configuration & env issues (read-only) |
-| `rn-firebase fix` | Auto-fix all detected problems |
-| `rn-firebase fix env` | Fix environment variables (`.env.local` / `.env`) |
-| `rn-firebase fix web` | Fix Web / JS SDK configuration |
-| `rn-firebase fix android` | Fix Android native configuration |
-| `rn-firebase fix ios` | Fix iOS native configuration |
-| `rn-firebase fix deps` | Install missing Firebase dependencies |
-| `rn-firebase --help` | Show help |
-| `rn-firebase --version` | Show version |
+| `firestack setup` | Interactive Firebase setup wizard |
+| `firestack doctor` | Diagnose configuration & env issues (read-only) |
+| `firestack fix` | Auto-fix all detected problems |
+| `firestack fix env` | Fix environment variables (`.env.local` / `.env`) |
+| `firestack fix web` | Fix Web / JS SDK configuration |
+| `firestack fix android` | Fix Android native configuration |
+| `firestack fix ios` | Fix iOS native configuration |
+| `firestack fix deps` | Install missing Firebase dependencies |
+| `firestack --help` | Show help |
+| `firestack --version` | Show version |
 
 ---
 
@@ -173,7 +172,7 @@ The CLI auto-detects your framework and guides you through every step:
 
 ### 1 · Multi-Framework Detection
 
-`rn-firebase-cli` inspects your project before making changes:
+`firestack-cli` inspects your project before making changes:
 
 - **Framework** — Next.js (App / Pages router), Expo (with Expo Router), Vite, CRA, Remix, Astro, SvelteKit, Bare React Native
 - **Package manager** — Bun, npm, pnpm, or Yarn
@@ -199,7 +198,7 @@ The CLI auto-detects your framework and guides you through every step:
 ### Doctor — read-only diagnostics
 
 ```bash
-npx rn-firebase-cli doctor
+npx firestack-cli doctor
 ```
 
 ```
@@ -225,12 +224,12 @@ No problems detected! Your Firebase setup is healthy.
 ### Fix — automated remediation
 
 ```bash
-npx rn-firebase-cli fix          # fix all issues
-npx rn-firebase-cli fix env      # fix .env / .env.local variables
-npx rn-firebase-cli fix web      # fix client boilerplate
-npx rn-firebase-cli fix android  # fix Android native
-npx rn-firebase-cli fix ios      # fix iOS native
-npx rn-firebase-cli fix deps     # install missing packages
+npx firestack-cli fix          # fix all issues
+npx firestack-cli fix env      # fix .env / .env.local variables
+npx firestack-cli fix web      # fix client boilerplate
+npx firestack-cli fix android  # fix Android native
+npx firestack-cli fix ios      # fix iOS native
+npx firestack-cli fix deps     # install missing packages
 ```
 
 ---
@@ -250,8 +249,8 @@ npx rn-firebase-cli fix deps     # install missing packages
 
 ```bash
 # Clone
-git clone https://github.com/tharunpoongavanam/rn-firebase-cli.git
-cd rn-firebase-cli
+git clone https://github.com/tharunpoongavanam/firestack-cli.git
+cd firestack-cli
 
 # Install
 bun install
@@ -273,7 +272,7 @@ bun run build
 
 <div align="center">
 
-**[npm](https://www.npmjs.com/package/rn-firebase-cli)** · **[GitHub](https://github.com/tharunpoongavanam/rn-firebase-cli)** · **[Issues](https://github.com/tharunpoongavanam/rn-firebase-cli/issues)**
+**[npm](https://www.npmjs.com/package/firestack-cli)** · **[GitHub](https://github.com/tharunpoongavanam/firestack-cli)** · **[Issues](https://github.com/tharunpoongavanam/firestack-cli/issues)**
 
 Made with ❤️ for the Web & Mobile React community
 

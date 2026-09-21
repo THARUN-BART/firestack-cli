@@ -28,13 +28,13 @@ describe('Doctor Checks', () => {
       (i) => i.category === 'Android' && i.name === 'google-services.json'
     );
     expect(missingAndroid?.status).toBe('fail');
-    expect(missingAndroid?.fixAction).toBe('rn-firebase fix android');
+    expect(missingAndroid?.fixAction).toBe('firestack fix android');
 
     const missingIos = report.items.find(
       (i) => i.category === 'iOS' && i.name === 'GoogleService-Info.plist'
     );
     expect(missingIos?.status).toBe('fail');
-    expect(missingIos?.fixAction).toBe('rn-firebase fix ios');
+    expect(missingIos?.fixAction).toBe('firestack fix ios');
   });
 
   it('detects existing files and passes checks for healthy Expo project', () => {

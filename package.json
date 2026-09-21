@@ -1,7 +1,7 @@
 {
-  "name": "rn-firebase-cli",
-  "version": "1.1.0",
-  "description": "Unified Firebase setup CLI for Next.js, Expo, React (Vite/CRA), Bare React Native, and Web frameworks",
+  "name": "firestack-cli",
+  "version": "1.0.0",
+  "description": "Universal Firebase setup CLI for Next.js, Expo, React (Vite/CRA), Bare React Native, Remix, and Web frameworks",
   "keywords": [
     "firebase",
     "nextjs",
@@ -9,6 +9,9 @@
     "react-native",
     "vite",
     "react",
+    "remix",
+    "astro",
+    "sveltekit",
     "cli",
     "setup",
     "android",
@@ -18,22 +21,22 @@
     "firebase-tools",
     "react-native-firebase"
   ],
-  "homepage": "https://github.com/THARUN-BART/rn-firebase-cli#readme",
+  "homepage": "https://github.com/tharunpoongavanam/firestack-cli#readme",
   "bugs": {
-    "url": "https://github.com/THARUN-BART/rn-firebase-cli/issues"
+    "url": "https://github.com/tharunpoongavanam/firestack-cli/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/THARUN-BART/rn-firebase-cli.git"
+    "url": "git+https://github.com/tharunpoongavanam/firestack-cli.git"
   },
   "license": "MIT",
-  "author": "Tharun Poongavanam <THARUN-BART@gmail.com>",
+  "author": "Tharun Poongavanam <tharunpoongavanam@gmail.com>",
   "main": "dist/cli.js",
   "module": "dist/cli.js",
   "type": "module",
   "bin": {
-    "rn-firebase-cli": "./bin/rn-firebase.mjs",
-    "rn-firebase": "./bin/rn-firebase.mjs"
+    "firestack-cli": "bin/firestack.mjs",
+    "firestack": "bin/firestack.mjs"
   },
   "files": [
     "dist/",

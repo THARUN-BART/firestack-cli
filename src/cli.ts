@@ -7,13 +7,13 @@ export function createCli(): Command {
   const program = new Command();
 
   program
-    .name('rn-firebase-cli')
-    .description('Unified Firebase Setup and Diagnostic CLI for React Native & Expo')
+    .name('firestack')
+    .description('Universal Firebase Setup and Diagnostic CLI for Next.js, Expo, React, React Native, and Web frameworks')
     .version('1.0.0');
 
   program
     .command('setup', { isDefault: true })
-    .description('Detect project state and configure Firebase for Android, iOS, and Web')
+    .description('Detect project state and configure Firebase for Web, Android, and iOS')
     .action(async () => {
       try {
         await runSetupCommand();
@@ -36,11 +36,11 @@ export function createCli(): Command {
     });
 
   program
-    .command('fix [platform]')
-    .description('Automatically resolve missing Firebase configuration (android, ios, web, deps, all)')
-    .action(async (platform?: string) => {
+    .command('fix [target]')
+    .description('Automatically resolve missing Firebase configuration (web, env, android, ios, deps, all)')
+    .action(async (target?: string) => {
       try {
-        await runFixCommand(platform);
+        await runFixCommand(target);
       } catch (err: any) {
         console.error('Fix failed:', err.message || err);
         process.exit(1);
@@ -50,6 +50,7 @@ export function createCli(): Command {
   return program;
 }
 
-if (import.meta.main || process.argv[1]?.endsWith('cli.ts') || process.argv[1]?.endsWith('cli.js') || process.argv[1]?.endsWith('rn-firebase')) {
+if (import.meta.main || process.argv[1]?.endsWith('cli.ts') || process.argv[1]?.endsWith('cli.js') || process.argv[1]?.endsWith('firestack.mjs') || process.argv[1]?.endsWith('firestack') || process.argv[1]?.endsWith('firestack-cli')) {
   createCli().parse(process.argv);
 }
+

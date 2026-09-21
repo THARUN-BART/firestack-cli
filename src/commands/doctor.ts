@@ -69,7 +69,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: project.envFileName,
         status: 'warn',
         message: `Missing ${project.envFileName} for ${project.frameworkDisplayName}`,
-        fixAction: 'rn-firebase fix env',
+        fixAction: 'firestack fix env',
         fixPlatform: 'env',
       });
     }
@@ -87,7 +87,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: 'Firebase configuration',
         status: 'fail',
         message: 'Missing Firebase configuration module',
-        fixAction: 'rn-firebase fix web',
+        fixAction: 'firestack fix web',
         fixPlatform: 'web',
       });
     }
@@ -98,7 +98,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
       name: 'firebase (JS SDK)',
       status: hasFirebaseSdk ? 'pass' : 'fail',
       message: hasFirebaseSdk ? 'Installed' : 'Missing firebase package',
-      fixAction: 'rn-firebase fix deps',
+      fixAction: 'firestack fix deps',
       fixPlatform: 'deps',
     });
   }
@@ -119,7 +119,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: 'google-services.json',
         status: 'fail',
         message: 'Missing google-services.json',
-        fixAction: 'rn-firebase fix android',
+        fixAction: 'firestack fix android',
         fixPlatform: 'android',
       });
     }
@@ -137,7 +137,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: 'Package ID',
         status: 'warn',
         message: 'Could not detect Android package name',
-        fixAction: 'rn-firebase fix android',
+        fixAction: 'firestack fix android',
         fixPlatform: 'android',
       });
     }
@@ -156,7 +156,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: 'GoogleService-Info.plist',
         status: 'fail',
         message: 'Missing GoogleService-Info.plist',
-        fixAction: 'rn-firebase fix ios',
+        fixAction: 'firestack fix ios',
         fixPlatform: 'ios',
       });
     }
@@ -174,7 +174,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
         name: 'Bundle ID',
         status: 'warn',
         message: 'Could not detect iOS bundle identifier',
-        fixAction: 'rn-firebase fix ios',
+        fixAction: 'firestack fix ios',
         fixPlatform: 'ios',
       });
     }
@@ -191,7 +191,7 @@ export function runDoctorChecks(projectDir: string = process.cwd()): DoctorRepor
       message: hasAnyDep
         ? `Installed (${hasRnfApp ? '@react-native-firebase/app' : 'firebase'})`
         : 'Missing Firebase dependency',
-      fixAction: 'rn-firebase fix deps',
+      fixAction: 'firestack fix deps',
       fixPlatform: 'deps',
     });
   }
