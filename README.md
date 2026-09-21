@@ -249,7 +249,7 @@ npx firestack-cli fix deps     # install missing packages
 
 ```bash
 # Clone
-git clone https://github.com/tharunpoongavanam/firestack-cli.git
+git clone https://github.com/THARUN-BART/firestack-cli.git
 cd firestack-cli
 
 # Install
@@ -266,13 +266,13 @@ bun run build
 
 ## 📄 License
 
-[MIT](LICENSE) © [Tharun Poongavanam](https://github.com/tharunpoongavanam)
+[MIT](LICENSE) © [Tharun Poongavanam](https://github.com/THARUN-BART)
 
 ---
 
 <div align="center">
 
-**[npm](https://www.npmjs.com/package/firestack-cli)** · **[GitHub](https://github.com/tharunpoongavanam/firestack-cli)** · **[Issues](https://github.com/tharunpoongavanam/firestack-cli/issues)**
+**[npm](https://www.npmjs.com/package/firestack-cli)** · **[GitHub](https://github.com/THARUN-BART/firestack-cli)** · **[Issues](https://github.com/THARUN-BART/firestack-cli/issues)**
 
 Made with ❤️ for the Web & Mobile React community
 
