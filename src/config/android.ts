@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileExists, isDirectory, readTextFile, writeTextFile } from '../utils/fs';
+import { fileExists, isDirectory, readTextFile, writeTextFile, backupIfExists } from '../utils/fs';
 import { updateExpoConfig } from '../expo/plugins';
 
 export interface AndroidConfigResult {
@@ -9,29 +9,10 @@ export interface AndroidConfigResult {
   warnings: string[];
 }
 
-/**
- * Fix #5/#8: Backup an existing file before overwriting it.
- * Returns the backup path if a backup was created, or null if no existing file.
- */
-function backupIfExists(filePath: string): string | null {
-  if (!fileExists(filePath)) return null;
-  const backupPath = filePath + '.bak';
-  try {
-    const content = readTextFile(filePath);
-    if (content) {
-      writeTextFile(backupPath, content);
-      return backupPath;
-    }
-  } catch {
-    // Non-fatal: proceed without backup
-  }
-  return null;
-}
 
 /**
- * Fix #4: Insert Google Services classpath ONLY inside the buildscript { ... }
+ * Insert Google Services classpath ONLY inside the buildscript { ... }
  * dependencies block, not the top-level project dependencies block.
- * Also fix #6: use isDirectory() instead of fileExists() for directory checks.
  */
 export function configureAndroidGradle(projectDir: string): { modified: boolean; warnings: string[] } {
   const warnings: string[] = [];
@@ -45,7 +26,13 @@ export function configureAndroidGradle(projectDir: string): { modified: boolean;
   const rootGradlePath = path.join(projectDir, 'android', 'build.gradle');
   if (fileExists(rootGradlePath)) {
     let content = readTextFile(rootGradlePath) || '';
-    if (!content.includes('com.google.gms:google-services') && !content.includes('com.google.gms.google-services')) {
+    // Security fix: guard against catastrophic backtracking on huge/adversarial Gradle files
+    if (content.length > 500_000) {
+      warnings.push(
+        'android/build.gradle exceeds 500KB — skipping automatic Gradle patch. ' +
+        'Please manually add: classpath("com.google.gms:google-services:4.4.2") inside buildscript > dependencies.'
+      );
+    } else if (!content.includes('com.google.gms:google-services') && !content.includes('com.google.gms.google-services')) {
       // Fix #4: Scope insert to inside the buildscript { ... } block only
       const buildscriptMatch = content.match(/(buildscript\s*\{[\s\S]*?dependencies\s*\{)/);
       if (buildscriptMatch) {

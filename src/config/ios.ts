@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileExists, isDirectory, readTextFile, writeTextFile } from '../utils/fs';
+import { fileExists, isDirectory, readTextFile, writeTextFile, backupIfExists } from '../utils/fs';
 import { updateExpoConfig } from '../expo/plugins';
+
 
 export interface IosConfigResult {
   googleServiceInfoPlistPlaced: boolean;
@@ -10,23 +11,6 @@ export interface IosConfigResult {
   warnings: string[];
 }
 
-/**
- * Fix #5/#8: Backup an existing file before overwriting it.
- */
-function backupIfExists(filePath: string): string | null {
-  if (!fileExists(filePath)) return null;
-  const backupPath = filePath + '.bak';
-  try {
-    const content = readTextFile(filePath);
-    if (content) {
-      writeTextFile(backupPath, content);
-      return backupPath;
-    }
-  } catch {
-    // Non-fatal
-  }
-  return null;
-}
 
 export function configureIos(
   projectDir: string,

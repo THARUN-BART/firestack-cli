@@ -57,3 +57,23 @@ export function writeJsonFile(filePath: string, data: any): boolean {
     return false;
   }
 }
+
+/**
+ * Backup a file before overwriting it. Creates <filePath>.bak if the file
+ * exists. Returns the backup path, or null if no backup was needed.
+ * Note: .bak files must be listed in .gitignore to prevent credential leaks.
+ */
+export function backupIfExists(filePath: string): string | null {
+  if (!fileExists(filePath)) return null;
+  const backupPath = filePath + '.bak';
+  try {
+    const content = readTextFile(filePath);
+    if (content) {
+      writeTextFile(backupPath, content);
+      return backupPath;
+    }
+  } catch {
+    // Non-fatal: proceed without backup
+  }
+  return null;
+}

@@ -15,12 +15,15 @@ logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+# dotenv environment variable files (all variants)
+.env*
+
+# Credential backup files created by firestack-cli before overwriting
+*.bak
+
+# Temporary credential files written during setup/fix (cleaned up on success,
+# but SIGKILL can bypass finally blocks — gitignore is the safety net)
+.tmp-*
 
 # caches
 .eslintcache

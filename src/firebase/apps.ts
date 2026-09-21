@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { runFirebaseCommand } from './cli';
 import { runCommandSync } from '../utils/exec';
 import { readTextFile } from '../utils/fs';
@@ -171,8 +172,19 @@ export function downloadSdkConfig(
 ): { success: boolean; content?: string; error?: string } {
   const args = ['apps:sdkconfig', platform.toLowerCase(), appId, '--project', projectId, '--json'];
   if (outputPath) {
+    // Security fix: validate outputPath stays within current working directory
+    // to prevent path traversal via the -o argument
+    if (path.isAbsolute(outputPath)) {
+      return { success: false, error: 'outputPath must be a relative path' };
+    }
+    const resolved = path.resolve(process.cwd(), outputPath);
+    const cwd = path.resolve(process.cwd());
+    if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+      return { success: false, error: 'outputPath escapes working directory' };
+    }
     args.push('-o', outputPath);
   }
+
 
   const res = runCommandSync('firebase', args);
 
