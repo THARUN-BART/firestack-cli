@@ -33,7 +33,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run tests
-        run: bun test --reporter=verbose
+        run: bun test
 
       - name: Build CLI
         run: bun run build
